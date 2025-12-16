@@ -1,0 +1,36 @@
+# State files (contain user-specific data)
+_state.json
+
+# Generated launcher files
+*.bat
+!Example-*.bat
+
+# Credentials and secrets
+*.secret
+*.key
+.env
+.env.*
+credentials*
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# SQLite databases
+*.sqlite
+*.db
