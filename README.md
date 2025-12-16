@@ -102,6 +102,13 @@ Skip online verification and trust all detected games. Faster but may include no
 .\Get-GameLaunchers.ps1 -SkipVerification
 ```
 
+### `-IgnoreUnverified`
+Skip unverified games entirely instead of placing them in the `Unverified/` subfolder. Use this if you only want launchers for confirmed games.
+
+```powershell
+.\Get-GameLaunchers.ps1 -IgnoreUnverified
+```
+
 ### `-DryRun`
 Output detected games without creating any `.bat` files. Useful for previewing what will be found.
 

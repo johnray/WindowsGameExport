@@ -23,6 +23,9 @@
 .PARAMETER SkipVerification
     Skip online verification and trust all detected games.
 
+.PARAMETER IgnoreUnverified
+    Skip unverified games entirely instead of placing them in the Unverified subfolder.
+
 .PARAMETER DryRun
     Output detected games without creating any .bat files.
 
@@ -58,6 +61,9 @@ param(
 
     [Parameter()]
     [switch]$SkipVerification,
+
+    [Parameter()]
+    [switch]$IgnoreUnverified,
 
     [Parameter()]
     [switch]$DryRun,
@@ -1518,14 +1524,23 @@ function Update-GameLaunchers {
         [PSCustomObject[]]$Games,
         [string]$OutputDirectory,
         [hashtable]$State,
-        [switch]$DryRun
+        [switch]$DryRun,
+        [switch]$IgnoreUnverified
     )
 
     $created = 0
     $updated = 0
     $unchanged = 0
+    $skipped = 0
 
     foreach ($game in $Games) {
+        # Skip unverified games if IgnoreUnverified is set
+        if ($IgnoreUnverified -and -not $game.Verified) {
+            $skipped++
+            Write-Host "Skipped (unverified): $($game.Name) ($($game.Platform))" -ForegroundColor DarkGray
+            continue
+        }
+
         $hash = $game.Hash
         $wasVerified = $State[$hash].Verified
         $existed = $State.ContainsKey($hash)
@@ -1559,6 +1574,7 @@ function Update-GameLaunchers {
         Created = $created
         Updated = $updated
         Unchanged = $unchanged
+        Skipped = $skipped
     }
 }
 
@@ -1708,7 +1724,7 @@ if (-not $SkipVerification -and $allGames.Count -gt 0) {
 
 # Generate launchers
 Write-Host "`nGenerating launcher files..." -ForegroundColor Cyan
-$results = Update-GameLaunchers -Games $allGames -OutputDirectory $OutputDirectory -State $state -DryRun:$DryRun
+$results = Update-GameLaunchers -Games $allGames -OutputDirectory $OutputDirectory -State $state -DryRun:$DryRun -IgnoreUnverified:$IgnoreUnverified
 
 # Save state
 if (-not $DryRun) {
@@ -1720,6 +1736,9 @@ Write-Host "`n=== Summary ===" -ForegroundColor Cyan
 Write-Host "  Created: $($results.Created)" -ForegroundColor Green
 Write-Host "  Updated: $($results.Updated)" -ForegroundColor Yellow
 Write-Host "  Unchanged: $($results.Unchanged)" -ForegroundColor Gray
+if ($results.Skipped -gt 0) {
+    Write-Host "  Skipped (unverified): $($results.Skipped)" -ForegroundColor DarkGray
+}
 Write-Host "  Output: $OutputDirectory" -ForegroundColor White
 
 #endregion
