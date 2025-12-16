@@ -1149,34 +1149,148 @@ function Get-FilesystemGames {
         'GameMaker' = @('data.win', '*.yy')
         'RPGMaker' = @('Game.exe', 'RPG_RT.exe', 'RGSS*.dll')
         'Ren''Py' = @('renpy', 'lib\python*')
+        'Electron' = @('chrome_100_percent.pak', 'resources.pak', 'libEGL.dll', 'ffmpeg.dll')
+        'Spring' = @('spring.exe', 'springsettings.cfg')  # For games like Beyond All Reason
+    }
+
+    # Helper function to check if a folder is a game
+    function Test-IsGameFolder {
+        param(
+            [string]$FolderPath,
+            [string]$FolderName
+        )
+
+        $result = @{ IsGame = $false; Engine = $null; Exe = $null; Name = $FolderName }
+
+        # Check for game engine indicators
+        foreach ($engine in $engineIndicators.Keys) {
+            foreach ($indicator in $engineIndicators[$engine]) {
+                $found = Get-ChildItem -Path $FolderPath -Filter $indicator -ErrorAction SilentlyContinue |
+                    Select-Object -First 1
+                if ($found) {
+                    $result.IsGame = $true
+                    $result.Engine = $engine
+                    break
+                }
+            }
+            if ($result.IsGame) { break }
+        }
+
+        # Check for executables with matching folder name
+        if (-not $result.IsGame) {
+            $matchingExe = Get-ChildItem -Path $FolderPath -Filter "*.exe" -ErrorAction SilentlyContinue |
+                Where-Object {
+                    $baseName = $_.BaseName -replace '[^a-zA-Z0-9]', ''
+                    $folderClean = $FolderName -replace '[^a-zA-Z0-9]', ''
+                    $baseName -like "*$folderClean*" -or $folderClean -like "*$baseName*"
+                } |
+                Select-Object -First 1
+
+            if ($matchingExe) {
+                $result.IsGame = $true
+                $result.Exe = $matchingExe
+            }
+        }
+
+        # If still not identified, check for common game file patterns
+        if (-not $result.IsGame) {
+            $exes = Get-ChildItem -Path $FolderPath -Filter "*.exe" -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -notmatch '(unins|setup|config|crash|update|launcher|vcredist|dxsetup|dotnet|UnityCrash|redist)' }
+
+            if ($exes.Count -ge 1) {
+                # Check for supporting game files
+                $hasGameFiles = (Get-ChildItem -Path $FolderPath -Filter "*.dll" -ErrorAction SilentlyContinue | Select-Object -First 1) -or
+                               (Test-Path (Join-Path $FolderPath "data")) -or
+                               (Test-Path (Join-Path $FolderPath "assets")) -or
+                               (Test-Path (Join-Path $FolderPath "content")) -or
+                               (Test-Path (Join-Path $FolderPath "Resources")) -or
+                               (Test-Path (Join-Path $FolderPath "bin"))
+
+                if ($hasGameFiles) {
+                    $result.IsGame = $true
+                }
+            }
+        }
+
+        # Find the best executable
+        if ($result.IsGame -and -not $result.Exe) {
+            $result.Exe = Get-ChildItem -Path $FolderPath -Filter "*.exe" -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -notmatch '(unins|setup|config|crash|update|launcher|vcredist|dxsetup|UnityCrash|redist)' } |
+                Sort-Object {
+                    $score = 0
+                    # Prefer exe with similar name to folder
+                    $baseName = $_.BaseName -replace '[^a-zA-Z0-9]', ''
+                    $folderClean = $FolderName -replace '[^a-zA-Z0-9]', ''
+                    if ($baseName -like "*$folderClean*" -or $folderClean -like "*$baseName*") {
+                        $score += 1000
+                    }
+                    # Prefer larger executables (usually the main game)
+                    $score + $_.Length / 1MB
+                } -Descending |
+                Select-Object -First 1
+        }
+
+        # Try to get a better name from the exe
+        if ($result.Exe) {
+            $exeName = $result.Exe.BaseName -replace '-', ' ' -replace '_', ' '
+            # If exe name looks better than folder name, use it
+            if ($exeName.Length -gt 3 -and $exeName -notmatch '^(game|app|launch|start|play)$') {
+                $result.Name = $exeName
+            }
+        }
+
+        return $result
     }
 
     foreach ($drive in $Drives) {
-        # Get root-level folders that might contain games
-        $searchRoots = @()
+        Write-Verbose "Scanning drive: $drive"
 
+        # First, check root-level folders directly as potential games
+        try {
+            $rootFolders = Get-ChildItem -Path "$drive\" -Directory -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -notin $excludeDirs -and $_.Name -notmatch '^[\$\.]' }
+
+            foreach ($folder in $rootFolders) {
+                # Skip excluded directories
+                $skip = $false
+                foreach ($exclude in $excludeDirs) {
+                    if ($folder.FullName -like "*$exclude*") {
+                        $skip = $true
+                        break
+                    }
+                }
+                if (-not $skip) {
+                    foreach ($userExclude in $UserExcludes) {
+                        if ($folder.FullName -like "$userExclude*" -or $folder.FullName -eq $userExclude) {
+                            $skip = $true
+                            Write-Verbose "Skipping user-excluded: $($folder.FullName)"
+                            break
+                        }
+                    }
+                }
+                if ($skip) { continue }
+
+                # Check if this root-level folder itself is a game
+                $gameCheck = Test-IsGameFolder -FolderPath $folder.FullName -FolderName $folder.Name
+                if ($gameCheck.IsGame -and $gameCheck.Exe) {
+                    $platform = if ($gameCheck.Engine) { "Standalone-$($gameCheck.Engine)" } else { "Standalone" }
+                    $launchCmd = "start `"`" `"$($gameCheck.Exe.FullName)`""
+                    $games += Write-GameInfo -Name $gameCheck.Name -Platform $platform -Path $folder.FullName -LaunchCommand $launchCmd
+                    Write-Verbose "Found standalone game (root): $($gameCheck.Name) ($platform)"
+                }
+            }
+        } catch {
+            Write-Verbose "Error scanning root of $drive`: $_"
+        }
+
+        # Get directories that commonly contain games
+        $searchRoots = @()
         foreach ($gameDir in $gameDirs) {
             $path = Join-Path $drive $gameDir
             if (Test-Path $path) {
                 $searchRoots += $path
             }
         }
-
-        # Also check root for game folders
-        try {
-            $rootFolders = Get-ChildItem -Path "$drive\" -Directory -ErrorAction SilentlyContinue |
-                Where-Object { $_.Name -notin $excludeDirs -and $_.Name -notmatch '^[\$\.]' }
-
-            foreach ($folder in $rootFolders) {
-                # Check if folder looks like a game directory
-                $hasExe = Get-ChildItem -Path $folder.FullName -Filter "*.exe" -ErrorAction SilentlyContinue |
-                    Select-Object -First 1
-
-                if ($hasExe) {
-                    $searchRoots += $folder.FullName
-                }
-            }
-        } catch {}
 
         $searchRoots = $searchRoots | Select-Object -Unique
 
@@ -1207,65 +1321,14 @@ function Get-FilesystemGames {
                     }
                     if ($skip) { continue }
 
-                    # Check for game engine indicators
-                    $isGame = $false
-                    $detectedEngine = $null
+                    # Use the helper function to check if this is a game
+                    $gameCheck = Test-IsGameFolder -FolderPath $folder.FullName -FolderName $folder.Name
 
-                    foreach ($engine in $engineIndicators.Keys) {
-                        foreach ($indicator in $engineIndicators[$engine]) {
-                            $found = Get-ChildItem -Path $folder.FullName -Filter $indicator -ErrorAction SilentlyContinue |
-                                Select-Object -First 1
-                            if ($found) {
-                                $isGame = $true
-                                $detectedEngine = $engine
-                                break
-                            }
-                        }
-                        if ($isGame) { break }
-                    }
-
-                    # If no engine detected, check for common game file patterns
-                    if (-not $isGame) {
-                        $exes = Get-ChildItem -Path $folder.FullName -Filter "*.exe" -ErrorAction SilentlyContinue |
-                            Where-Object { $_.Name -notmatch '(unins|setup|config|crash|update|launcher|vcredist|dxsetup|dotnet|UnityCrash|redist)' }
-
-                        if ($exes.Count -ge 1) {
-                            # Check for supporting game files
-                            $hasGameFiles = (Test-Path (Join-Path $folder.FullName "*.dll")) -or
-                                           (Test-Path (Join-Path $folder.FullName "data")) -or
-                                           (Test-Path (Join-Path $folder.FullName "assets")) -or
-                                           (Test-Path (Join-Path $folder.FullName "content")) -or
-                                           (Test-Path (Join-Path $folder.FullName "Resources"))
-
-                            if ($hasGameFiles) {
-                                $isGame = $true
-                            }
-                        }
-                    }
-
-                    if ($isGame) {
-                        $name = $folder.Name
-                        $path = $folder.FullName
-
-                        # Find main executable
-                        $exe = Get-ChildItem -Path $path -Filter "*.exe" -ErrorAction SilentlyContinue |
-                            Where-Object { $_.Name -notmatch '(unins|setup|config|crash|update|launcher|vcredist|dxsetup|UnityCrash|redist)' } |
-                            Sort-Object {
-                                # Prefer exe with similar name to folder
-                                $similarity = 0
-                                if ($_.BaseName -like "*$($folder.Name)*" -or $folder.Name -like "*$($_.BaseName)*") {
-                                    $similarity = 100
-                                }
-                                $similarity + $_.Length
-                            } -Descending |
-                            Select-Object -First 1
-
-                        if ($exe) {
-                            $platform = if ($detectedEngine) { "Standalone-$detectedEngine" } else { "Standalone" }
-                            $launchCmd = "start `"`" `"$($exe.FullName)`""
-                            $games += Write-GameInfo -Name $name -Platform $platform -Path $path -LaunchCommand $launchCmd
-                            Write-Verbose "Found standalone game: $name ($platform)"
-                        }
+                    if ($gameCheck.IsGame -and $gameCheck.Exe) {
+                        $platform = if ($gameCheck.Engine) { "Standalone-$($gameCheck.Engine)" } else { "Standalone" }
+                        $launchCmd = "start `"`" `"$($gameCheck.Exe.FullName)`""
+                        $games += Write-GameInfo -Name $gameCheck.Name -Platform $platform -Path $folder.FullName -LaunchCommand $launchCmd
+                        Write-Verbose "Found standalone game: $($gameCheck.Name) ($platform)"
                     }
                 }
             } catch {
