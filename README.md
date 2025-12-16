@@ -27,19 +27,19 @@ Automatically detect installed games across all major PC gaming platforms and ge
 
 ```powershell
 # Dry run - see what games would be found
-.\Get-GameLaunchers.ps1 -DryRun
+.\WindowsGameExport.ps1 -DryRun
 
 # Create launchers in a specific folder
-.\Get-GameLaunchers.ps1 -OutputDirectory "C:\GameLaunchers"
+.\WindowsGameExport.ps1 -OutputDirectory "C:\GameLaunchers"
 
 # Include filesystem scan for standalone games
-.\Get-GameLaunchers.ps1 -OutputDirectory "C:\GameLaunchers" -IncludeFilesystemScan
+.\WindowsGameExport.ps1 -OutputDirectory "C:\GameLaunchers" -IncludeFilesystemScan
 
 # Skip online verification (trust all detected games)
-.\Get-GameLaunchers.ps1 -OutputDirectory "C:\GameLaunchers" -SkipVerification
+.\WindowsGameExport.ps1 -OutputDirectory "C:\GameLaunchers" -SkipVerification
 
 # Scan specific drives only
-.\Get-GameLaunchers.ps1 -Drives "D:", "E:" -OutputDirectory "D:\GameLaunchers"
+.\WindowsGameExport.ps1 -Drives "D:", "E:" -OutputDirectory "D:\GameLaunchers"
 ```
 
 ## How It Works
@@ -56,28 +56,28 @@ Automatically detect installed games across all major PC gaming platforms and ge
 Array of drive letters to scan for games. Default: all fixed drives.
 
 ```powershell
-.\Get-GameLaunchers.ps1 -Drives "C:", "D:", "E:"
+.\WindowsGameExport.ps1 -Drives "C:", "D:", "E:"
 ```
 
 ### `-OutputDirectory`
 Directory where `.bat` launcher files will be created. Will prompt if not specified.
 
 ```powershell
-.\Get-GameLaunchers.ps1 -OutputDirectory "C:\GameLaunchers"
+.\WindowsGameExport.ps1 -OutputDirectory "C:\GameLaunchers"
 ```
 
 ### `-RawgApiKey`
 Optional RAWG API key for improved game verification accuracy. Get one free at https://rawg.io/apidocs
 
 ```powershell
-.\Get-GameLaunchers.ps1 -RawgApiKey "your-api-key-here"
+.\WindowsGameExport.ps1 -RawgApiKey "your-api-key-here"
 ```
 
 ### `-IncludeFilesystemScan`
 Enable filesystem scanning for standalone games not installed via launchers. This is slower but finds games installed outside of standard platforms.
 
 ```powershell
-.\Get-GameLaunchers.ps1 -IncludeFilesystemScan
+.\WindowsGameExport.ps1 -IncludeFilesystemScan
 ```
 
 Detects games by identifying:
@@ -92,28 +92,28 @@ Detects games by identifying:
 Array of directory paths to exclude from filesystem scanning. Useful for skipping large non-game directories.
 
 ```powershell
-.\Get-GameLaunchers.ps1 -IncludeFilesystemScan -Exclude "D:\Media", "D:\Documents", "E:\Backup"
+.\WindowsGameExport.ps1 -IncludeFilesystemScan -Exclude "D:\Media", "D:\Documents", "E:\Backup"
 ```
 
 ### `-SkipVerification`
 Skip online verification and trust all detected games. Faster but may include non-games.
 
 ```powershell
-.\Get-GameLaunchers.ps1 -SkipVerification
+.\WindowsGameExport.ps1 -SkipVerification
 ```
 
 ### `-IgnoreUnverified`
 Skip unverified games entirely instead of placing them in the `Unverified/` subfolder. Use this if you only want launchers for confirmed games.
 
 ```powershell
-.\Get-GameLaunchers.ps1 -IgnoreUnverified
+.\WindowsGameExport.ps1 -IgnoreUnverified
 ```
 
 ### `-DryRun`
 Output detected games without creating any `.bat` files. Useful for previewing what will be found.
 
 ```powershell
-.\Get-GameLaunchers.ps1 -DryRun
+.\WindowsGameExport.ps1 -DryRun
 ```
 
 Example output:
@@ -151,14 +151,14 @@ Dry run complete. No files were created.
 Path to configuration/state JSON file. Default: `_state.json` in OutputDirectory.
 
 ```powershell
-.\Get-GameLaunchers.ps1 -ConfigFile "D:\my_game_state.json"
+.\WindowsGameExport.ps1 -ConfigFile "D:\my_game_state.json"
 ```
 
 ### `-Verbose`
 Show detailed progress output during scanning.
 
 ```powershell
-.\Get-GameLaunchers.ps1 -Verbose
+.\WindowsGameExport.ps1 -Verbose
 ```
 
 ## Output Structure
@@ -271,13 +271,13 @@ start "" "steam://rungameid/1091500"
 ### Basic Usage
 ```powershell
 # Scan all drives, prompt for output directory
-.\Get-GameLaunchers.ps1
+.\WindowsGameExport.ps1
 ```
 
 ### Full Scan with Verification
 ```powershell
 # Comprehensive scan with RAWG verification
-.\Get-GameLaunchers.ps1 `
+.\WindowsGameExport.ps1 `
     -OutputDirectory "C:\GameLaunchers" `
     -IncludeFilesystemScan `
     -RawgApiKey "your-api-key"
@@ -286,7 +286,7 @@ start "" "steam://rungameid/1091500"
 ### Fast Scan Without Verification
 ```powershell
 # Quick scan, trust all detected games
-.\Get-GameLaunchers.ps1 `
+.\WindowsGameExport.ps1 `
     -OutputDirectory "C:\GameLaunchers" `
     -SkipVerification
 ```
@@ -294,7 +294,7 @@ start "" "steam://rungameid/1091500"
 ### Selective Drive Scan
 ```powershell
 # Only scan game drives, exclude media folders
-.\Get-GameLaunchers.ps1 `
+.\WindowsGameExport.ps1 `
     -Drives "D:", "E:" `
     -OutputDirectory "D:\GameLaunchers" `
     -IncludeFilesystemScan `
@@ -304,16 +304,16 @@ start "" "steam://rungameid/1091500"
 ### Preview Mode
 ```powershell
 # See what games are installed without creating files
-.\Get-GameLaunchers.ps1 -DryRun -Verbose
+.\WindowsGameExport.ps1 -DryRun -Verbose
 
 # Preview with filesystem scan
-.\Get-GameLaunchers.ps1 -DryRun -IncludeFilesystemScan
+.\WindowsGameExport.ps1 -DryRun -IncludeFilesystemScan
 ```
 
 ### Update Existing Launchers
 ```powershell
 # Re-run to update - only changed/new games will be processed
-.\Get-GameLaunchers.ps1 -OutputDirectory "C:\GameLaunchers"
+.\WindowsGameExport.ps1 -OutputDirectory "C:\GameLaunchers"
 ```
 
 ## Advanced Usage
@@ -321,7 +321,7 @@ start "" "steam://rungameid/1091500"
 ### Combine with Other Tools
 ```powershell
 # Run and capture output
-$output = .\Get-GameLaunchers.ps1 -DryRun -Verbose 2>&1
+$output = .\WindowsGameExport.ps1 -DryRun -Verbose 2>&1
 
 # Parse for specific platforms
 $steamGames = $output | Select-String "\[Steam\]"
@@ -333,7 +333,7 @@ Create a scheduled task to periodically update launchers:
 ```powershell
 # Create scheduled task (run in elevated PowerShell)
 $action = New-ScheduledTaskAction -Execute "PowerShell.exe" `
-    -Argument "-ExecutionPolicy Bypass -File `"C:\Scripts\Get-GameLaunchers.ps1`" -OutputDirectory `"C:\GameLaunchers`" -SkipVerification"
+    -Argument "-ExecutionPolicy Bypass -File `"C:\Scripts\WindowsGameExport.ps1`" -OutputDirectory `"C:\GameLaunchers`" -SkipVerification"
 
 $trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At 3am
 
@@ -365,7 +365,7 @@ The generated `.bat` files can be:
 If you get "cannot be loaded because running scripts is disabled":
 
 **Option 1: Unblock the file**
-1. Right-click `Get-GameLaunchers.ps1` in Windows Explorer
+1. Right-click `WindowsGameExport.ps1` in Windows Explorer
 2. Select Properties
 3. Check "Unblock" at the bottom of General tab
 4. Click OK
@@ -377,7 +377,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 **Option 3: Bypass for single run**
 ```powershell
-powershell -ExecutionPolicy Bypass -File ".\Get-GameLaunchers.ps1" -DryRun
+powershell -ExecutionPolicy Bypass -File ".\WindowsGameExport.ps1" -DryRun
 ```
 
 ### No Games Found for Platform

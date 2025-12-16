@@ -36,13 +36,13 @@
     Array of directory paths to exclude from scanning (useful for large non-game directories).
 
 .EXAMPLE
-    .\Get-GameLaunchers.ps1 -Drives "C:", "D:" -OutputDirectory "C:\GameLaunchers"
+    .\WindowsGameExport.ps1 -Drives "C:", "D:" -OutputDirectory "C:\GameLaunchers"
 
 .EXAMPLE
-    .\Get-GameLaunchers.ps1 -DryRun -IncludeFilesystemScan
+    .\WindowsGameExport.ps1 -DryRun -IncludeFilesystemScan
 
 .EXAMPLE
-    .\Get-GameLaunchers.ps1 -IncludeFilesystemScan -Exclude "D:\Media", "D:\Documents", "E:\Backup"
+    .\WindowsGameExport.ps1 -IncludeFilesystemScan -Exclude "D:\Media", "D:\Documents", "E:\Backup"
 #>
 
 [CmdletBinding()]
@@ -512,7 +512,22 @@ function Get-XboxGames {
         'NamcoBandai',
         'Techland',
         'TeamNinja',
-        'Koei'
+        'Koei',
+        'ElectronicArts',
+        'EA',
+        'Blizzard',
+        'Riot',
+        'NetEase',
+        'Annapurna',
+        'RawFury',
+        'CoffeeStain',
+        'Klei',
+        'Supergiant',
+        'InXile',
+        'Obsidian',
+        'DoubleFine',
+        'PlaydeoStudios',
+        'Panic'
     )
 
     # Explicit exclusions - these are NOT games
@@ -1418,15 +1433,24 @@ function Test-RawgGame {
     try {
         $response = Invoke-RestMethod -Uri $url -Method Get -ErrorAction Stop
 
-        if ($response.count -gt 0) {
+        if ($response.count -gt 0 -and $response.results) {
             $result = $response.results[0]
-            # Check if the name is reasonably similar
-            $similarity = [Math]::Max(
-                $result.name.ToLower().Contains($normalized.ToLower().Substring(0, [Math]::Min(10, $normalized.Length))),
-                $normalized.ToLower().Contains($result.name.ToLower().Substring(0, [Math]::Min(10, $result.name.Length)))
-            )
+            if (-not $result.name) {
+                return $false
+            }
 
-            return $similarity -or ($response.count -eq 1)
+            # Check if the name is reasonably similar
+            $normalizedLower = $normalized.ToLower()
+            $resultLower = $result.name.ToLower()
+            $checkLen = [Math]::Min(10, [Math]::Min($normalizedLower.Length, $resultLower.Length))
+
+            if ($checkLen -gt 0) {
+                $isSimilar = $resultLower.Contains($normalizedLower.Substring(0, $checkLen)) -or
+                             $normalizedLower.Contains($resultLower.Substring(0, $checkLen))
+                return $isSimilar
+            }
+
+            return $response.count -eq 1
         }
 
         return $false
@@ -1537,7 +1561,9 @@ function Update-GameLaunchers {
         # Skip unverified games if IgnoreUnverified is set
         if ($IgnoreUnverified -and -not $game.Verified) {
             $skipped++
-            Write-Host "Skipped (unverified): $($game.Name) ($($game.Platform))" -ForegroundColor DarkGray
+            Write-Host "    [SKIP] " -ForegroundColor DarkYellow -NoNewline
+            Write-Host "$($game.Name) " -ForegroundColor DarkGray -NoNewline
+            Write-Host "($($game.Platform))" -ForegroundColor DarkGray
             continue
         }
 
@@ -1554,10 +1580,14 @@ function Update-GameLaunchers {
 
         if ($existed) {
             $updated++
-            Write-Host "Updated: $($game.Name) ($($game.Platform))" -ForegroundColor Yellow
+            Write-Host "    [UPD]  " -ForegroundColor Yellow -NoNewline
+            Write-Host "$($game.Name) " -ForegroundColor White -NoNewline
+            Write-Host "($($game.Platform))" -ForegroundColor DarkGray
         } else {
             $created++
-            Write-Host "Created: $($game.Name) ($($game.Platform))" -ForegroundColor Green
+            Write-Host "    [NEW]  " -ForegroundColor Green -NoNewline
+            Write-Host "$($game.Name) " -ForegroundColor White -NoNewline
+            Write-Host "($($game.Platform))" -ForegroundColor DarkGray
         }
 
         # Update state
@@ -1589,11 +1619,10 @@ Add-Type -AssemblyName System.Web
 if (-not $Drives) {
     $Drives = Get-WmiObject -Class Win32_LogicalDisk -Filter "DriveType=3" |
         Select-Object -ExpandProperty DeviceID
-    Write-Host "Detected drives: $($Drives -join ', ')" -ForegroundColor Cyan
 }
 
-# Prompt for output directory if not specified
-if (-not $OutputDirectory) {
+# Prompt for output directory if not specified (skip for DryRun)
+if (-not $OutputDirectory -and -not $DryRun) {
     $OutputDirectory = Read-Host "Enter output directory for .bat files"
     if (-not $OutputDirectory) {
         $OutputDirectory = Join-Path $env:USERPROFILE "GameLaunchers"
@@ -1601,18 +1630,18 @@ if (-not $OutputDirectory) {
 }
 
 # Ensure output directory exists
-if (-not (Test-Path $OutputDirectory) -and -not $DryRun) {
+if ($OutputDirectory -and -not (Test-Path $OutputDirectory) -and -not $DryRun) {
     New-Item -Path $OutputDirectory -ItemType Directory -Force | Out-Null
 }
 
 # State file
-if (-not $ConfigFile) {
+if (-not $ConfigFile -and $OutputDirectory) {
     $ConfigFile = Join-Path $OutputDirectory "_state.json"
 }
 
 # Load existing state
 $state = @{}
-if ((Test-Path $ConfigFile) -and -not $DryRun) {
+if ($ConfigFile -and (Test-Path $ConfigFile) -and -not $DryRun) {
     try {
         $stateJson = Get-Content -Path $ConfigFile -Raw | ConvertFrom-Json
         foreach ($prop in $stateJson.PSObject.Properties) {
@@ -1623,81 +1652,123 @@ if ((Test-Path $ConfigFile) -and -not $DryRun) {
     }
 }
 
-Write-Host "`n=== Game Launcher Generator ===" -ForegroundColor Cyan
-Write-Host "Output: $OutputDirectory"
-Write-Host "Drives: $($Drives -join ', ')"
-if ($Exclude) { Write-Host "Excludes: $($Exclude -join ', ')" -ForegroundColor Gray }
-if ($DryRun) { Write-Host "Mode: DRY RUN (no files will be created)" -ForegroundColor Yellow }
+# Display header
+Write-Host ""
+Write-Host "  ============================================================" -ForegroundColor Cyan
+Write-Host "                    WINDOWS GAME EXPORT" -ForegroundColor White
+Write-Host "  ============================================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "  Configuration:" -ForegroundColor DarkGray
+Write-Host "    Drives:  $($Drives -join ', ')" -ForegroundColor White
+if (-not $DryRun -and $OutputDirectory) {
+    Write-Host "    Output:  $OutputDirectory" -ForegroundColor White
+}
+if ($Exclude) {
+    Write-Host "    Exclude: $($Exclude -join ', ')" -ForegroundColor DarkYellow
+}
+if ($DryRun) {
+    Write-Host "    Mode:    DRY RUN (no files will be created)" -ForegroundColor Yellow
+}
 Write-Host ""
 
 # Collect all games
 $allGames = @()
 
-Write-Host "Scanning for games..." -ForegroundColor Cyan
+Write-Host "  Scanning platforms..." -ForegroundColor Cyan
+Write-Host "  ------------------------------------------------------------" -ForegroundColor DarkGray
+
+# Helper to format platform results
+function Write-PlatformLine {
+    param([string]$Name, [int]$Count, [string]$Color = "White")
+    $countStr = if ($Count -gt 0) { "$Count games" } else { "-" }
+    $countColor = if ($Count -gt 0) { "Green" } else { "DarkGray" }
+    Write-Host "    " -NoNewline
+    Write-Host "$Name".PadRight(20) -ForegroundColor $Color -NoNewline
+    Write-Host $countStr -ForegroundColor $countColor
+}
 
 # Steam
 $steamGames = Get-SteamGames -Drives $Drives -Verbose:$VerbosePreference
-Write-Host "  Steam: $($steamGames.Count) games found"
+Write-PlatformLine -Name "Steam" -Count $steamGames.Count -Color "Cyan"
 $allGames += $steamGames
 
 # Epic
 $epicGames = Get-EpicGames -Verbose:$VerbosePreference
-Write-Host "  Epic Games: $($epicGames.Count) games found"
+Write-PlatformLine -Name "Epic Games" -Count $epicGames.Count -Color "Yellow"
 $allGames += $epicGames
 
 # GOG
 $gogGames = Get-GOGGames -Drives $Drives -Verbose:$VerbosePreference
-Write-Host "  GOG: $($gogGames.Count) games found"
+Write-PlatformLine -Name "GOG Galaxy" -Count $gogGames.Count -Color "Magenta"
 $allGames += $gogGames
 
 # Xbox
 $xboxGames = Get-XboxGames -Verbose:$VerbosePreference
-Write-Host "  Xbox/Microsoft Store: $($xboxGames.Count) games found"
+Write-PlatformLine -Name "Xbox / MS Store" -Count $xboxGames.Count -Color "Green"
 $allGames += $xboxGames
 
 # Amazon
 $amazonGames = Get-AmazonGames -Verbose:$VerbosePreference
-Write-Host "  Amazon Games: $($amazonGames.Count) games found"
+Write-PlatformLine -Name "Amazon Games" -Count $amazonGames.Count -Color "DarkYellow"
 $allGames += $amazonGames
 
 # EA
 $eaGames = Get-EAGames -Verbose:$VerbosePreference
-Write-Host "  EA/Origin: $($eaGames.Count) games found"
+Write-PlatformLine -Name "EA / Origin" -Count $eaGames.Count -Color "Red"
 $allGames += $eaGames
 
 # Ubisoft
 $ubisoftGames = Get-UbisoftGames -Verbose:$VerbosePreference
-Write-Host "  Ubisoft Connect: $($ubisoftGames.Count) games found"
+Write-PlatformLine -Name "Ubisoft Connect" -Count $ubisoftGames.Count -Color "DarkCyan"
 $allGames += $ubisoftGames
 
 # Battle.net
 $battleNetGames = Get-BattleNetGames -Verbose:$VerbosePreference
-Write-Host "  Battle.net: $($battleNetGames.Count) games found"
+Write-PlatformLine -Name "Battle.net" -Count $battleNetGames.Count -Color "Blue"
 $allGames += $battleNetGames
 
 # Filesystem scan (optional)
 if ($IncludeFilesystemScan) {
     $fsGames = Get-FilesystemGames -Drives $Drives -UserExcludes $Exclude -Verbose:$VerbosePreference
-    Write-Host "  Filesystem scan: $($fsGames.Count) potential games found"
+    Write-PlatformLine -Name "Filesystem Scan" -Count $fsGames.Count -Color "Gray"
     $allGames += $fsGames
 }
 
-Write-Host "`nTotal: $($allGames.Count) games detected" -ForegroundColor Green
+Write-Host "  ------------------------------------------------------------" -ForegroundColor DarkGray
+Write-Host "    TOTAL" -ForegroundColor White -NoNewline
+Write-Host "               $($allGames.Count) games" -ForegroundColor Cyan
+Write-Host ""
 
 # DryRun mode - just output the list
 if ($DryRun) {
-    Write-Host "`n=== Detected Games ===" -ForegroundColor Cyan
-    $allGames | Sort-Object Platform, Name | ForEach-Object {
-        Write-Host "  [$($_.Platform)] $($_.Name)" -ForegroundColor White
-        Write-Host "    Path: $($_.Path)" -ForegroundColor Gray
+    Write-Host "  Detected Games:" -ForegroundColor Cyan
+    Write-Host "  ------------------------------------------------------------" -ForegroundColor DarkGray
+
+    $sortedGames = $allGames | Sort-Object Platform, Name
+    $currentPlatform = ""
+
+    foreach ($game in $sortedGames) {
+        if ($game.Platform -ne $currentPlatform) {
+            $currentPlatform = $game.Platform
+            Write-Host ""
+            Write-Host "    [$currentPlatform]" -ForegroundColor Yellow
+        }
+        Write-Host "      > $($game.Name)" -ForegroundColor White
+        Write-Host "        $($game.Path)" -ForegroundColor DarkGray
     }
-    Write-Host "`nDry run complete. No files were created." -ForegroundColor Yellow
+
+    Write-Host ""
+    Write-Host "  ============================================================" -ForegroundColor Green
+    Write-Host "    Dry run complete. No files were created." -ForegroundColor Yellow
+    Write-Host "  ============================================================" -ForegroundColor Green
+    Write-Host ""
     exit 0
 }
 
 # Verify games
 if (-not $SkipVerification -and $allGames.Count -gt 0) {
-    Write-Host "`nVerifying games online (this may take a while)..." -ForegroundColor Cyan
+    Write-Host "  Verifying games (Wikipedia/RAWG)..." -ForegroundColor Cyan
+    Write-Host "  ------------------------------------------------------------" -ForegroundColor DarkGray
     $verified = 0
     $unverified = 0
 
@@ -1707,14 +1778,18 @@ if (-not $SkipVerification -and $allGames.Count -gt 0) {
 
         if ($isVerified) {
             $verified++
-            Write-Host "  [OK] $($game.Name)" -ForegroundColor Green
+            Write-Host "    [OK] " -ForegroundColor Green -NoNewline
+            Write-Host "$($game.Name)" -ForegroundColor White
         } else {
             $unverified++
-            Write-Host "  [??] $($game.Name)" -ForegroundColor Yellow
+            Write-Host "    [??] " -ForegroundColor Yellow -NoNewline
+            Write-Host "$($game.Name)" -ForegroundColor DarkGray
         }
     }
 
-    Write-Host "`nVerification: $verified verified, $unverified unverified" -ForegroundColor Cyan
+    Write-Host "  ------------------------------------------------------------" -ForegroundColor DarkGray
+    Write-Host "    Verified: $verified  |  Unverified: $unverified" -ForegroundColor Cyan
+    Write-Host ""
 } else {
     # Mark all as verified if skipping verification
     foreach ($game in $allGames) {
@@ -1723,7 +1798,8 @@ if (-not $SkipVerification -and $allGames.Count -gt 0) {
 }
 
 # Generate launchers
-Write-Host "`nGenerating launcher files..." -ForegroundColor Cyan
+Write-Host "  Generating launcher files..." -ForegroundColor Cyan
+Write-Host "  ------------------------------------------------------------" -ForegroundColor DarkGray
 $results = Update-GameLaunchers -Games $allGames -OutputDirectory $OutputDirectory -State $state -DryRun:$DryRun -IgnoreUnverified:$IgnoreUnverified
 
 # Save state
@@ -1732,13 +1808,23 @@ if (-not $DryRun) {
 }
 
 # Summary
-Write-Host "`n=== Summary ===" -ForegroundColor Cyan
-Write-Host "  Created: $($results.Created)" -ForegroundColor Green
-Write-Host "  Updated: $($results.Updated)" -ForegroundColor Yellow
-Write-Host "  Unchanged: $($results.Unchanged)" -ForegroundColor Gray
+Write-Host ""
+Write-Host "  ============================================================" -ForegroundColor Green
+Write-Host "                         COMPLETE" -ForegroundColor White
+Write-Host "  ============================================================" -ForegroundColor Green
+Write-Host ""
+Write-Host "    Created:   " -ForegroundColor Gray -NoNewline
+Write-Host "$($results.Created) new launchers" -ForegroundColor Cyan
+Write-Host "    Updated:   " -ForegroundColor Gray -NoNewline
+Write-Host "$($results.Updated) launchers" -ForegroundColor Yellow
+Write-Host "    Unchanged: " -ForegroundColor Gray -NoNewline
+Write-Host "$($results.Unchanged) launchers" -ForegroundColor DarkGray
 if ($results.Skipped -gt 0) {
-    Write-Host "  Skipped (unverified): $($results.Skipped)" -ForegroundColor DarkGray
+    Write-Host "    Skipped:   " -ForegroundColor Gray -NoNewline
+    Write-Host "$($results.Skipped) unverified" -ForegroundColor DarkYellow
 }
-Write-Host "  Output: $OutputDirectory" -ForegroundColor White
+Write-Host ""
+Write-Host "    Output: $OutputDirectory" -ForegroundColor White
+Write-Host ""
 
 #endregion
