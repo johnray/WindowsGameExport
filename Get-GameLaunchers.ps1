@@ -511,6 +511,7 @@ function Get-XboxGames {
 
     # Explicit exclusions - these are NOT games
     $excludePatterns = @(
+        # Microsoft apps
         'Microsoft\.Bing',
         'Microsoft\.Edge',
         'Microsoft\.Windows',
@@ -538,9 +539,41 @@ function Get-XboxGames {
         'Microsoft\.Todos',
         'Microsoft\.PowerAutomateDesktop',
         'Microsoft\.OneDrive',
+        'Microsoft\.GamingApp',
+        'Microsoft\.XboxApp',
+        'Microsoft\.WindowsTerminal',
+        'Microsoft\.WindowsNotepad',
+        'Microsoft\.WindowsCalculator',
+        'Microsoft\.WindowsCamera',
+        'Microsoft\.WindowsAlarms',
+        'Microsoft\.ZuneMusic',
+        'Microsoft\.ZuneVideo',
+        'Microsoft\.Photos',
+        'Microsoft\.SkypeApp',
+        'Microsoft\.MicrosoftOfficeHub',
+        'Microsoft\.MicrosoftStickyNotes',
+        'Microsoft\.Whiteboard',
+        'Microsoft\.3DBuilder',
+        'Microsoft\.3DViewer',
+        'Microsoft\.MixedReality',
+        'Microsoft\.Print3D',
+        'Microsoft\.Messaging',
+        'Microsoft\.OneConnect',
+        'Microsoft\.NetworkSpeedTest',
+        'Microsoft\.RemoteDesktop',
+        'Microsoft\.PowerBI',
+        # MicrosoftCorporationII apps
+        'MicrosoftCorporationII\.QuickAssist',
+        'MicrosoftCorporationII\.WindowsSubsystemForLinux',
+        'MicrosoftCorporationII\.WinAppRuntime',
+        # MicrosoftWindows apps
+        'MicrosoftWindows\.Client',
+        'MicrosoftWindows\.CrossDevice',
+        # Third party utilities (NOT games)
         'MSTeams',
         'Clipchamp',
         'SpotifyAB',
+        'Spotify',
         'Ubuntu',
         'Debian',
         'SUSE',
@@ -554,34 +587,84 @@ function Get-XboxGames {
         'FileExplorer',
         'SecureAssessmentBrowser',
         'PrintQueueActionCenter',
-        'CoreAI'
+        'CoreAI',
+        'AdvancedMicroDevicesInc', # AMD Radeon Software
+        'AppleInc\.iCloud',
+        'Apple\.iTunes',
+        'MICRO-STARINTERNATION', # MSI Center
+        'ASUSTeK', # ASUS utilities
+        'IntelCorporation',
+        'NVIDIA',
+        'Logitech',
+        'Corsair',
+        'Razer',
+        'SteelSeries',
+        'Discord',
+        'Zoom',
+        'Slack',
+        'Telegram',
+        'WhatsApp',
+        'Signal',
+        'Opera',
+        'Mozilla',
+        'Google',
+        'Amazon\.Kindle',
+        'Audible',
+        'Dropbox',
+        'Evernote',
+        'Adobe',
+        'Autodesk',
+        'PuTTY',
+        'WinSCP',
+        'Notepad\+\+',
+        'VSCode',
+        'PowerToys'
     )
 
     try {
         $packages = Get-AppxPackage -ErrorAction SilentlyContinue | Where-Object {
             $pkg = $_
 
-            # First check exclusions
+            # First check exclusions - these are definitely NOT games
             foreach ($exclude in $excludePatterns) {
                 if ($pkg.Name -match $exclude) {
                     return $false
                 }
             }
 
+            # Skip system apps and framework packages
+            if ($pkg.SignatureKind -eq 'System' -or $pkg.IsFramework -eq $true) {
+                return $false
+            }
+
+            # Skip if no install location
+            if (-not $pkg.InstallLocation) {
+                return $false
+            }
+
             # Check if it's in an XboxGames folder (high confidence)
-            if ($pkg.InstallLocation -and $pkg.InstallLocation -match '\\XboxGames\\') {
+            if ($pkg.InstallLocation -match '\\XboxGames\\') {
                 return $true
             }
 
-            # Check if it's from a known game publisher
+            # Check if it's from a known game publisher (by name pattern)
             foreach ($publisher in $gamePublishers) {
-                if ($pkg.Publisher -like "*$publisher*") {
+                if ($pkg.Publisher -like "*$publisher*" -or $pkg.Name -like "*$publisher*") {
                     return $true
                 }
             }
 
             # Check for specific Microsoft game packages
             if ($pkg.Name -match '^Microsoft\.(Minecraft|MicrosoftSolitaireCollection|FlightSimulator|Forza|Halo|SeaOfThieves|StateOfDecay|GearsPOP|AgeOfEmpires|MicrosoftMahjong|MicrosoftJigsaw|MicrosoftCasualGames)') {
+                return $true
+            }
+
+            # Include third-party apps that are NOT Microsoft and NOT in exclusions
+            # These are likely games from Game Pass or MS Store
+            if ($pkg.Name -notmatch '^Microsoft\.' -and
+                $pkg.Name -notmatch '^Windows\.' -and
+                $pkg.Name -notmatch '^windows\.' -and
+                $pkg.InstallLocation -match 'WindowsApps') {
                 return $true
             }
 
@@ -624,6 +707,67 @@ function Get-XboxGames {
         }
     } catch {
         Write-Verbose "Error scanning Xbox games: $_"
+    }
+
+    # Also scan for Xbox Game Pass games installed to custom XboxGames folders
+    # These don't show up in Get-AppxPackage but have appxmanifest.xml in Content folder
+    $xboxGamesFolders = @()
+
+    # Check common XboxGames locations on all drives
+    $drives = Get-WmiObject -Class Win32_LogicalDisk -Filter "DriveType=3" | Select-Object -ExpandProperty DeviceID
+    foreach ($drive in $drives) {
+        $xboxPath = Join-Path $drive "XboxGames"
+        if (Test-Path $xboxPath) {
+            $xboxGamesFolders += $xboxPath
+        }
+    }
+
+    foreach ($xboxFolder in $xboxGamesFolders) {
+        Write-Verbose "Scanning XboxGames folder: $xboxFolder"
+        try {
+            $gameFolders = Get-ChildItem -Path $xboxFolder -Directory -ErrorAction SilentlyContinue
+
+            foreach ($gameFolder in $gameFolders) {
+                # Skip if already found via Get-AppxPackage
+                if ($games | Where-Object { $_.Name -eq $gameFolder.Name }) {
+                    continue
+                }
+
+                # Check for appxmanifest.xml in Content subfolder
+                $manifestPath = Join-Path $gameFolder.FullName "Content\appxmanifest.xml"
+                if (Test-Path $manifestPath) {
+                    try {
+                        [xml]$manifest = Get-Content $manifestPath -ErrorAction SilentlyContinue
+
+                        $displayName = $manifest.Package.Properties.DisplayName
+                        if ($displayName -match '^ms-resource:') {
+                            # Try to get from Identity or folder name
+                            $displayName = $gameFolder.Name
+                        }
+
+                        $packageName = $manifest.Package.Identity.Name
+                        $appId = $manifest.Package.Applications.Application.Id
+
+                        if ($displayName -and $displayName.Length -gt 2) {
+                            # Xbox Game Pass games use a special launch method
+                            # shell:AppsFolder\PackageFamilyName!AppId
+                            $publisher = $manifest.Package.Identity.Publisher
+                            # Extract publisher hash (simplified - real hash is more complex)
+                            $publisherHash = ($publisher -replace '[^a-zA-Z0-9]', '').Substring(0, [Math]::Min(13, ($publisher -replace '[^a-zA-Z0-9]', '').Length))
+
+                            $launchCmd = "explorer.exe shell:AppsFolder\$packageName`_$publisherHash!$appId"
+
+                            $games += Write-GameInfo -Name $displayName -Platform "Xbox" -Path $gameFolder.FullName -LaunchCommand $launchCmd
+                            Write-Verbose "Found Xbox game (XboxGames folder): $displayName"
+                        }
+                    } catch {
+                        Write-Verbose "Error parsing manifest in $($gameFolder.Name): $_"
+                    }
+                }
+            }
+        } catch {
+            Write-Verbose "Error scanning XboxGames folder: $_"
+        }
     }
 
     return $games
