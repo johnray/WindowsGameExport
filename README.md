@@ -246,25 +246,40 @@ start "" "steam://rungameid/1091500"
 
 ## Game Verification
 
-### Wikipedia API (Primary)
-- Queries Wikipedia for game title
-- Checks page categories for video game indicators
-- Categories checked: "video games", "Windows games", "PC games", "PlayStation", "Xbox game", "Nintendo", etc.
-- Free, no API key required
-- Rate limited (500ms between requests)
+The script uses **dynamic verification** with no hardcoded exclusion lists. Items are verified in real-time using web APIs.
 
-### RAWG API (Fallback)
+### Platform Trust
+Games from dedicated gaming platforms are automatically trusted:
+- **Steam, Epic, GOG, Battle.net, Amazon Games, EA, Ubisoft** - These platforms only distribute games
+- **Xbox Game Pass** (XboxGames folder) - Trusted as Game Pass content
+
+Items from general sources (WindowsApps, filesystem scan) require online verification.
+
+### DuckDuckGo Search (Primary)
+- Queries DuckDuckGo Instant Answer API
+- Checks if the item is described as a video game
+- Also checks for non-game indicators (browser, utility, driver, etc.)
+- Free, no API key required
+
+### Wikipedia API (Secondary)
+- Queries Wikipedia for the item name
+- Checks page categories for video game indicators
+- Also checks page extract text for game/non-game patterns
+- Categories: "video games", "Windows games", "PC games", etc.
+- Free, no API key required
+
+### RAWG API (Optional)
 - 500,000+ game database
-- More accurate matching
+- More accurate matching for less-known games
 - Requires free API key signup at https://rawg.io/apidocs
 - 20,000 requests/month on free tier
 
 ### Verification Logic
-1. Normalize game name (remove edition suffixes, special characters)
-2. Query Wikipedia API
-3. If found with game categories → verified
-4. If not found → try RAWG API (if key provided)
-5. If still not found → mark as unverified (placed in Unverified subfolder)
+1. If from trusted gaming platform → auto-verified
+2. Query DuckDuckGo for game/non-game indicators
+3. Query Wikipedia for categories and content
+4. Query RAWG API (if key provided)
+5. If all methods inconclusive → mark as unverified (placed in Unverified subfolder)
 
 ## Usage Examples
 

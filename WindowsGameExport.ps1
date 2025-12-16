@@ -482,178 +482,15 @@ function Get-XboxGames {
     Write-Verbose "Scanning for Xbox/Microsoft Store games..."
     $games = @()
 
-    # Known game publishers/developers for filtering (must be exact or partial match on publisher)
-    $gamePublishers = @(
-        'Bethesda',
-        'ZeniMax',
-        '505Games',
-        'Ubisoft',
-        'Activision',
-        'Bandai',
-        'Capcom',
-        'DeepSilver',
-        'Devolver',
-        'FocusHome',
-        'Gearbox',
-        'Paradox',
-        'PrivateDivision',
-        'RockstarGames',
-        'SquareEnix',
-        'THQ',
-        'TakeTwo',
-        'Warner',
-        'CDPROJEKTRED',
-        'KochMedia',
-        'Sega',
-        'Konami',
-        '2K',
-        'Codemasters',
-        'FromSoftware',
-        'NamcoBandai',
-        'Techland',
-        'TeamNinja',
-        'Koei',
-        'ElectronicArts',
-        'EA',
-        'Blizzard',
-        'Riot',
-        'NetEase',
-        'Annapurna',
-        'RawFury',
-        'CoffeeStain',
-        'Klei',
-        'Supergiant',
-        'InXile',
-        'Obsidian',
-        'DoubleFine',
-        'PlaydeoStudios',
-        'Panic'
-    )
-
-    # Explicit exclusions - these are NOT games
-    $excludePatterns = @(
-        # Microsoft apps
-        'Microsoft\.Bing',
-        'Microsoft\.Edge',
-        'Microsoft\.Windows',
-        'Microsoft\.Office',
-        'Microsoft\.Store',
-        'Microsoft\.Xbox\.TCUI',
-        'Microsoft\.XboxIdentityProvider',
-        'Microsoft\.XboxSpeechToTextOverlay',
-        'Microsoft\.XboxGamingOverlay',
-        'Microsoft\.XboxGameCallableUI',
-        'Microsoft\.SecHealthUI',
-        'Microsoft\.GetHelp',
-        'Microsoft\.People',
-        'Microsoft\.Wallet',
-        'Microsoft\.WebMediaExtensions',
-        'Microsoft\.VP9VideoExtensions',
-        'Microsoft\.HEIFImageExtension',
-        'Microsoft\.WebpImageExtension',
-        'Microsoft\.ScreenSketch',
-        'Microsoft\.Paint',
-        'Microsoft\.MSPaint',
-        'Microsoft\.YourPhone',
-        'Microsoft\.549981C3F5F10', # Cortana
-        'Microsoft\.MicrosoftEdge',
-        'Microsoft\.Todos',
-        'Microsoft\.PowerAutomateDesktop',
-        'Microsoft\.OneDrive',
-        'Microsoft\.GamingApp',
-        'Microsoft\.XboxApp',
-        'Microsoft\.WindowsTerminal',
-        'Microsoft\.WindowsNotepad',
-        'Microsoft\.WindowsCalculator',
-        'Microsoft\.WindowsCamera',
-        'Microsoft\.WindowsAlarms',
-        'Microsoft\.ZuneMusic',
-        'Microsoft\.ZuneVideo',
-        'Microsoft\.Photos',
-        'Microsoft\.SkypeApp',
-        'Microsoft\.MicrosoftOfficeHub',
-        'Microsoft\.MicrosoftStickyNotes',
-        'Microsoft\.Whiteboard',
-        'Microsoft\.3DBuilder',
-        'Microsoft\.3DViewer',
-        'Microsoft\.MixedReality',
-        'Microsoft\.Print3D',
-        'Microsoft\.Messaging',
-        'Microsoft\.OneConnect',
-        'Microsoft\.NetworkSpeedTest',
-        'Microsoft\.RemoteDesktop',
-        'Microsoft\.PowerBI',
-        # MicrosoftCorporationII apps
-        'MicrosoftCorporationII\.QuickAssist',
-        'MicrosoftCorporationII\.WindowsSubsystemForLinux',
-        'MicrosoftCorporationII\.WinAppRuntime',
-        # MicrosoftWindows apps
-        'MicrosoftWindows\.Client',
-        'MicrosoftWindows\.CrossDevice',
-        # Third party utilities (NOT games)
-        'MSTeams',
-        'Clipchamp',
-        'SpotifyAB',
-        'Spotify',
-        'Ubuntu',
-        'Debian',
-        'SUSE',
-        'Kali',
-        'Canonical',
-        'TheDebianProject',
-        'WhitewaterFoundry',
-        'RealtekSemiconductor',
-        'NVIDIACorp',
-        'DolbyLaboratories',
-        'FileExplorer',
-        'SecureAssessmentBrowser',
-        'PrintQueueActionCenter',
-        'CoreAI',
-        'AdvancedMicroDevicesInc', # AMD Radeon Software
-        'AppleInc\.iCloud',
-        'Apple\.iTunes',
-        'MICRO-STARINTERNATION', # MSI Center
-        'ASUSTeK', # ASUS utilities
-        'IntelCorporation',
-        'NVIDIA',
-        'Logitech',
-        'Corsair',
-        'Razer',
-        'SteelSeries',
-        'Discord',
-        'Zoom',
-        'Slack',
-        'Telegram',
-        'WhatsApp',
-        'Signal',
-        'Opera',
-        'Mozilla',
-        'Google',
-        'Amazon\.Kindle',
-        'Audible',
-        'Dropbox',
-        'Evernote',
-        'Adobe',
-        'Autodesk',
-        'PuTTY',
-        'WinSCP',
-        'Notepad\+\+',
-        'VSCode',
-        'PowerToys'
-    )
+    # Note: We no longer use hardcoded exclusion lists.
+    # All detected items will be verified online via Wikipedia/RAWG.
+    # This dynamic approach handles any app without manual maintenance.
 
     try {
         $packages = Get-AppxPackage -ErrorAction SilentlyContinue | Where-Object {
             $pkg = $_
 
-            # First check exclusions - these are definitely NOT games
-            foreach ($exclude in $excludePatterns) {
-                if ($pkg.Name -match $exclude) {
-                    return $false
-                }
-            }
-
-            # Skip system apps and framework packages
+            # Skip system apps and framework packages (these are never games)
             if ($pkg.SignatureKind -eq 'System' -or $pkg.IsFramework -eq $true) {
                 return $false
             }
@@ -663,29 +500,13 @@ function Get-XboxGames {
                 return $false
             }
 
-            # Check if it's in an XboxGames folder (high confidence)
+            # High confidence: XboxGames folder - definitely games
             if ($pkg.InstallLocation -match '\\XboxGames\\') {
                 return $true
             }
 
-            # Check if it's from a known game publisher (by name pattern)
-            foreach ($publisher in $gamePublishers) {
-                if ($pkg.Publisher -like "*$publisher*" -or $pkg.Name -like "*$publisher*") {
-                    return $true
-                }
-            }
-
-            # Check for specific Microsoft game packages
-            if ($pkg.Name -match '^Microsoft\.(Minecraft|MicrosoftSolitaireCollection|FlightSimulator|Forza|Halo|SeaOfThieves|StateOfDecay|GearsPOP|AgeOfEmpires|MicrosoftMahjong|MicrosoftJigsaw|MicrosoftCasualGames)') {
-                return $true
-            }
-
-            # Include third-party apps that are NOT Microsoft and NOT in exclusions
-            # These are likely games from Game Pass or MS Store
-            if ($pkg.Name -notmatch '^Microsoft\.' -and
-                $pkg.Name -notmatch '^Windows\.' -and
-                $pkg.Name -notmatch '^windows\.' -and
-                $pkg.InstallLocation -match 'WindowsApps') {
+            # Include all WindowsApps packages - verification will filter non-games
+            if ($pkg.InstallLocation -match 'WindowsApps') {
                 return $true
             }
 
@@ -1143,18 +964,17 @@ function Get-FilesystemGames {
     Write-Verbose "Performing filesystem scan for standalone games..."
     $games = @()
 
-    # Directories to exclude (built-in)
+    # Directories to exclude - only core system directories
+    # Application-specific exclusions are NOT used; verification handles filtering
     $excludeDirs = @(
         'Windows', 'System32', 'SysWOW64', 'WinSxS',
         'Program Files\Common Files', 'Program Files (x86)\Common Files',
         'ProgramData', 'Users', '$Recycle.Bin', 'Recovery',
         'Documents and Settings', 'MSOCache', 'PerfLogs',
-        'WindowsApps', 'node_modules', '.git', '.svn',
-        'Steam\steamapps', 'SteamLibrary\steamapps',
-        'Epic Games\Launcher', 'GOG Galaxy\GalaxyClient',
-        'Origin', 'EA Desktop', 'Ubisoft\Ubisoft Game Launcher',
-        'Battle.net'
+        'WindowsApps', 'node_modules', '.git', '.svn'
     )
+    # Note: We no longer exclude platform-specific folders (Steam, Epic, etc.)
+    # Those platforms are scanned separately, and duplicates are handled by hash
 
     # Directories that commonly contain games
     $gameDirs = @(
@@ -1365,6 +1185,107 @@ function Get-FilesystemGames {
 
 #region Verification Functions
 
+function Test-WebSearchGame {
+    [CmdletBinding()]
+    param(
+        [string]$Name
+    )
+
+    # Use DuckDuckGo Instant Answer API to check if this is described as a game
+    $normalized = Get-NormalizedGameName -Name $Name
+    $encoded = [System.Web.HttpUtility]::UrlEncode($normalized)
+
+    $url = "https://api.duckduckgo.com/?q=$encoded&format=json&no_html=1&skip_disambig=1"
+
+    try {
+        $response = Invoke-RestMethod -Uri $url -Method Get -TimeoutSec 10 -ErrorAction Stop
+
+        # Check Abstract and AbstractText only (not related topics which are too broad)
+        $textToCheck = @(
+            $response.Abstract,
+            $response.AbstractText
+        ) -join ' '
+
+        # Skip if no meaningful content
+        if ([string]::IsNullOrWhiteSpace($textToCheck)) {
+            return $null
+        }
+
+        # First check if it's explicitly NOT a game (utility, software, etc.)
+        # Do this first to avoid false positives from things like "game store"
+        $nonGameTerms = @(
+            'web browser', 'is a browser', 'internet browser',
+            'email client', 'email application', 'mail application',
+            'operating system', 'Linux distribution',
+            'software company', 'technology company', 'corporation',
+            'driver software', 'device driver', 'graphics driver',
+            'utility software', 'system utility', 'file manager',
+            'productivity software', 'office suite', 'word processor',
+            'antivirus', 'security software', 'malware',
+            'text editor', 'code editor', 'IDE',
+            'cloud storage', 'file synchronization', 'backup software',
+            'messaging app', 'chat application', 'communication platform',
+            'video conferencing', 'online meeting',
+            'digital distribution', 'app store', 'software distribution',
+            'control panel', 'settings app', 'configuration tool',
+            'photo editor', 'image editor', 'video editor',
+            'media player', 'music player', 'audio player',
+            'hardware', 'peripheral', 'motherboard', 'graphics card'
+        )
+
+        foreach ($term in $nonGameTerms) {
+            if ($textToCheck -match [regex]::Escape($term)) {
+                Write-Verbose "Web search found non-game term '$term' for '$Name'"
+                return $false
+            }
+        }
+
+        # Check if it IS a game - use specific patterns that indicate the subject itself is a game
+        # Avoid terms like 'gaming' which appear in non-game contexts (gaming laptop, gaming mouse, etc.)
+        $gamePatterns = @(
+            'is a video game',
+            'is a computer game',
+            'is an action game',
+            'is an adventure game',
+            'is a role-playing game',
+            'is a shooter',
+            'is a platformer',
+            'is a strategy game',
+            'is a simulation game',
+            'is a racing game',
+            'is a puzzle game',
+            'is a fighting game',
+            'is a sports game',
+            'is a survival game',
+            'is an indie game',
+            'is a multiplayer',
+            'is a single-player',
+            'video game developed',
+            'video game published',
+            'action-adventure game',
+            'first-person shooter',
+            'third-person shooter',
+            'real-time strategy',
+            'turn-based strategy',
+            'roguelike', 'roguelite',
+            'metroidvania',
+            'developed by .+ and published by'
+        )
+
+        foreach ($pattern in $gamePatterns) {
+            if ($textToCheck -match $pattern) {
+                Write-Verbose "Web search found game pattern '$pattern' for '$Name'"
+                return $true
+            }
+        }
+
+        return $null  # Inconclusive
+    } catch {
+        Write-Verbose "DuckDuckGo API error for '$Name': $_"
+        return $null
+    }
+}
+
 function Test-WikipediaGame {
     [CmdletBinding()]
     param(
@@ -1374,7 +1295,8 @@ function Test-WikipediaGame {
     $normalized = Get-NormalizedGameName -Name $GameName
     $encoded = [System.Web.HttpUtility]::UrlEncode($normalized)
 
-    $url = "https://en.wikipedia.org/w/api.php?action=query&titles=$encoded&prop=categories&cllimit=50&format=json"
+    # Get both categories and a snippet of the page content
+    $url = "https://en.wikipedia.org/w/api.php?action=query&titles=$encoded&prop=categories|extracts&cllimit=50&exintro=1&explaintext=1&exsentences=5&format=json"
 
     try {
         $response = Invoke-RestMethod -Uri $url -Method Get -ErrorAction Stop
@@ -1385,29 +1307,105 @@ function Test-WikipediaGame {
 
         if ($pageId -eq '-1') {
             # Page not found, try with " (video game)" suffix
-            $url2 = "https://en.wikipedia.org/w/api.php?action=query&titles=$encoded%20(video%20game)&prop=categories&cllimit=50&format=json"
+            $url2 = "https://en.wikipedia.org/w/api.php?action=query&titles=$encoded%20(video%20game)&prop=categories|extracts&cllimit=50&exintro=1&explaintext=1&exsentences=5&format=json"
             $response = Invoke-RestMethod -Uri $url2 -Method Get -ErrorAction Stop
             $pages = $response.query.pages
             $pageId = ($pages.PSObject.Properties | Select-Object -First 1).Name
 
             if ($pageId -eq '-1') {
-                return $false
+                return $null  # Not found
             }
         }
 
-        # Check categories for video game indicators
-        $categories = $pages.$pageId.categories
+        $page = $pages.$pageId
+        $extract = $page.extract
+
+        # First check if it's explicitly NOT a game (check extract text)
+        if ($extract) {
+            $nonGamePatterns = @(
+                'is a web browser',
+                'is an? (?:email|mail) (?:client|application)',
+                'is an? operating system',
+                'is a Linux distribution',
+                'is a company',
+                'is a corporation',
+                'is a (?:technology|software|hardware) company',
+                'is a (?:software|system) utility',
+                'is a file manager',
+                'is a text editor',
+                'is a cloud storage',
+                'is a messaging',
+                'is a communication',
+                'digital distribution platform',
+                'app store',
+                'is a media player',
+                'is a graphics driver',
+                'is a control panel'
+            )
+
+            foreach ($pattern in $nonGamePatterns) {
+                if ($extract -match $pattern) {
+                    Write-Verbose "Wikipedia found non-game pattern '$pattern' for '$GameName'"
+                    return $false
+                }
+            }
+        }
+
+        # Check categories for video game indicators (most reliable)
+        $categories = $page.categories
         if ($categories) {
-            $gameCategories = $categories | Where-Object {
-                $_.title -match '(video game|Video game|Windows game|PC game|PlayStation|Xbox game|Nintendo|Steam game|multiplayer game|single-player game)'
-            }
+            $gameCategoryPatterns = @(
+                'video games$',
+                'Video games$',
+                'Windows games',
+                'PC games',
+                'PlayStation .* games',
+                'Xbox .* games',
+                'Nintendo .* games',
+                'Steam games',
+                'multiplayer .*games',
+                'single-player .*games',
+                'games developed',
+                'games by genre'
+            )
 
-            if ($gameCategories) {
-                return $true
+            foreach ($cat in $categories) {
+                foreach ($pattern in $gameCategoryPatterns) {
+                    if ($cat.title -match $pattern) {
+                        Write-Verbose "Wikipedia found game category '$($cat.title)' for '$GameName'"
+                        return $true
+                    }
+                }
             }
         }
 
-        return $false
+        # Also check the extract/intro text for game-related patterns
+        if ($extract) {
+            $gamePatterns = @(
+                'is a .*video game',
+                'is a .*computer game',
+                'is an? .*action game',
+                'is an? .*adventure game',
+                'is an? .*role-playing game',
+                'is an? .*shooter',
+                'is an? .*platformer',
+                'is an? .*strategy game',
+                'is an? .*simulation',
+                'is an? .*racing game',
+                'is an? .*puzzle game',
+                'video game developed by',
+                'video game published by'
+            )
+
+            foreach ($pattern in $gamePatterns) {
+                if ($extract -match $pattern) {
+                    Write-Verbose "Wikipedia found game pattern '$pattern' for '$GameName'"
+                    return $true
+                }
+            }
+        }
+
+        return $null  # Inconclusive
     } catch {
         Write-Verbose "Wikipedia API error for '$GameName': $_"
         return $null  # Unknown, API failed
@@ -1464,6 +1462,7 @@ function Confirm-IsGame {
     [CmdletBinding()]
     param(
         [string]$GameName,
+        [string]$Platform,
         [string]$RawgApiKey,
         [switch]$SkipVerification
     )
@@ -1472,30 +1471,62 @@ function Confirm-IsGame {
         return $true
     }
 
-    Write-Verbose "Verifying: $GameName"
+    Write-Verbose "Verifying: $GameName ($Platform)"
 
-    # Try Wikipedia first
+    # Trusted gaming platforms - these don't distribute non-games
+    # If something is from Steam/Epic/GOG/Battle.net, it's a game
+    $trustedPlatforms = @('Steam', 'Epic', 'GOG', 'Battle.net', 'Amazon', 'EA', 'Ubisoft')
+    if ($Platform -in $trustedPlatforms) {
+        Write-Verbose "Trusted platform ($Platform) - auto-verified"
+        return $true
+    }
+
+    # Xbox platform - trust if it's from the XboxGames folder (GamePass games)
+    # Otherwise verify, as WindowsApps contains many non-games
+    if ($Platform -eq 'Xbox') {
+        # This will be checked via the Path in the calling code
+        # For now, do full verification for Xbox packages
+    }
+
+    # Standalone games need verification
+    # Try DuckDuckGo search first (fast, no API key needed)
+    $webResult = Test-WebSearchGame -Name $GameName
+    Start-Sleep -Milliseconds 300
+
+    if ($webResult -eq $true) {
+        return $true
+    }
+    if ($webResult -eq $false) {
+        # Explicitly identified as NOT a game
+        return $false
+    }
+
+    # Try Wikipedia (categories + content check)
     $wikiResult = Test-WikipediaGame -GameName $GameName
-
-    # Rate limiting
-    Start-Sleep -Milliseconds 500
+    Start-Sleep -Milliseconds 300
 
     if ($wikiResult -eq $true) {
         return $true
     }
+    if ($wikiResult -eq $false) {
+        # Explicitly identified as NOT a game
+        return $false
+    }
 
-    # Try RAWG if available and Wikipedia didn't confirm
+    # Try RAWG if available and other methods were inconclusive
     if ($RawgApiKey) {
         $rawgResult = Test-RawgGame -GameName $GameName -ApiKey $RawgApiKey
-        Start-Sleep -Milliseconds 500
+        Start-Sleep -Milliseconds 300
 
         if ($rawgResult -eq $true) {
             return $true
         }
+        if ($rawgResult -eq $false) {
+            return $false
+        }
     }
 
-    # If we got explicit false from both, it's not verified
-    # If we got null (API errors), consider it unverified but not rejected
+    # All methods were inconclusive - mark as unverified
     return $false
 }
 
@@ -1773,7 +1804,13 @@ if (-not $SkipVerification -and $allGames.Count -gt 0) {
     $unverified = 0
 
     foreach ($game in $allGames) {
-        $isVerified = Confirm-IsGame -GameName $game.Name -RawgApiKey $RawgApiKey -SkipVerification:$SkipVerification
+        # Xbox games from XboxGames folder are trusted (Game Pass games)
+        if ($game.Platform -eq 'Xbox' -and $game.Path -match '\\XboxGames\\') {
+            $isVerified = $true
+            Write-Verbose "Xbox Game Pass (XboxGames folder) - auto-verified"
+        } else {
+            $isVerified = Confirm-IsGame -GameName $game.Name -Platform $game.Platform -RawgApiKey $RawgApiKey -SkipVerification:$SkipVerification
+        }
         $game.Verified = $isVerified
 
         if ($isVerified) {
