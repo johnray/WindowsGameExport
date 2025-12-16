@@ -218,6 +218,7 @@ function Get-SteamGames {
 
     Write-Verbose "Scanning for Steam games..."
     $games = @()
+    $seenAppIds = @{}
 
     # Find Steam install path from registry
     $steamPath = $null
@@ -295,6 +296,12 @@ function Get-SteamGames {
                     if (-not $name -or $name -match '^(Steamworks|Proton|Steam Linux)') {
                         continue
                     }
+
+                    # Skip duplicates (same appId already processed)
+                    if ($seenAppIds.ContainsKey($appId)) {
+                        continue
+                    }
+                    $seenAppIds[$appId] = $true
 
                     $gamePath = Join-Path $steamAppsPath "common\$installDir"
 
@@ -469,15 +476,11 @@ function Get-XboxGames {
     Write-Verbose "Scanning for Xbox/Microsoft Store games..."
     $games = @()
 
-    # Known game publishers/developers for filtering
+    # Known game publishers/developers for filtering (must be exact or partial match on publisher)
     $gamePublishers = @(
-        'Microsoft.Xbox',
-        'Microsoft.Minecraft',
-        'Microsoft.MicrosoftSolitaire',
         'Bethesda',
         'ZeniMax',
         '505Games',
-        'EA',
         'Ubisoft',
         'Activision',
         'Bandai',
@@ -492,40 +495,127 @@ function Get-XboxGames {
         'SquareEnix',
         'THQ',
         'TakeTwo',
-        'Warner'
+        'Warner',
+        'CDPROJEKTRED',
+        'KochMedia',
+        'Sega',
+        'Konami',
+        '2K',
+        'Codemasters',
+        'FromSoftware',
+        'NamcoBandai',
+        'Techland',
+        'TeamNinja',
+        'Koei'
+    )
+
+    # Explicit exclusions - these are NOT games
+    $excludePatterns = @(
+        'Microsoft\.Bing',
+        'Microsoft\.Edge',
+        'Microsoft\.Windows',
+        'Microsoft\.Office',
+        'Microsoft\.Store',
+        'Microsoft\.Xbox\.TCUI',
+        'Microsoft\.XboxIdentityProvider',
+        'Microsoft\.XboxSpeechToTextOverlay',
+        'Microsoft\.XboxGamingOverlay',
+        'Microsoft\.XboxGameCallableUI',
+        'Microsoft\.SecHealthUI',
+        'Microsoft\.GetHelp',
+        'Microsoft\.People',
+        'Microsoft\.Wallet',
+        'Microsoft\.WebMediaExtensions',
+        'Microsoft\.VP9VideoExtensions',
+        'Microsoft\.HEIFImageExtension',
+        'Microsoft\.WebpImageExtension',
+        'Microsoft\.ScreenSketch',
+        'Microsoft\.Paint',
+        'Microsoft\.MSPaint',
+        'Microsoft\.YourPhone',
+        'Microsoft\.549981C3F5F10', # Cortana
+        'Microsoft\.MicrosoftEdge',
+        'Microsoft\.Todos',
+        'Microsoft\.PowerAutomateDesktop',
+        'Microsoft\.OneDrive',
+        'MSTeams',
+        'Clipchamp',
+        'SpotifyAB',
+        'Ubuntu',
+        'Debian',
+        'SUSE',
+        'Kali',
+        'Canonical',
+        'TheDebianProject',
+        'WhitewaterFoundry',
+        'RealtekSemiconductor',
+        'NVIDIACorp',
+        'DolbyLaboratories',
+        'FileExplorer',
+        'SecureAssessmentBrowser',
+        'PrintQueueActionCenter',
+        'CoreAI'
     )
 
     try {
         $packages = Get-AppxPackage -ErrorAction SilentlyContinue | Where-Object {
             $pkg = $_
-            # Check if it's from a known game publisher
-            $isGame = $gamePublishers | Where-Object { $pkg.Name -like "*$_*" -or $pkg.Publisher -like "*$_*" }
-            # Or if it's in an XboxGames folder
-            $isGame = $isGame -or ($pkg.InstallLocation -and $pkg.InstallLocation -match 'XboxGames')
-            # Or has gaming-related keywords
-            $isGame = $isGame -or ($pkg.Name -match '(Game|Gaming|Xbox)' -and $pkg.Name -notmatch '(Services|Bar|Overlay|App$)')
 
-            return $isGame
+            # First check exclusions
+            foreach ($exclude in $excludePatterns) {
+                if ($pkg.Name -match $exclude) {
+                    return $false
+                }
+            }
+
+            # Check if it's in an XboxGames folder (high confidence)
+            if ($pkg.InstallLocation -and $pkg.InstallLocation -match '\\XboxGames\\') {
+                return $true
+            }
+
+            # Check if it's from a known game publisher
+            foreach ($publisher in $gamePublishers) {
+                if ($pkg.Publisher -like "*$publisher*") {
+                    return $true
+                }
+            }
+
+            # Check for specific Microsoft game packages
+            if ($pkg.Name -match '^Microsoft\.(Minecraft|MicrosoftSolitaireCollection|FlightSimulator|Forza|Halo|SeaOfThieves|StateOfDecay|GearsPOP|AgeOfEmpires|MicrosoftMahjong|MicrosoftJigsaw|MicrosoftCasualGames)') {
+                return $true
+            }
+
+            return $false
         }
 
         foreach ($pkg in $packages) {
             try {
                 # Get display name from manifest
                 $manifestPath = Join-Path $pkg.InstallLocation "AppxManifest.xml"
-                $displayName = $pkg.Name
+                $displayName = $null
 
                 if (Test-Path $manifestPath) {
-                    [xml]$manifest = Get-Content $manifestPath -ErrorAction SilentlyContinue
-                    if ($manifest.Package.Properties.DisplayName -and
-                        $manifest.Package.Properties.DisplayName -notmatch '^ms-resource:') {
-                        $displayName = $manifest.Package.Properties.DisplayName
+                    try {
+                        [xml]$manifest = Get-Content $manifestPath -ErrorAction SilentlyContinue
+                        $rawDisplayName = $manifest.Package.Properties.DisplayName
+                        if ($rawDisplayName -and $rawDisplayName -notmatch '^ms-resource:') {
+                            $displayName = $rawDisplayName
+                        }
+                    } catch {}
+                }
+
+                # If no display name from manifest, try to parse from package name
+                if (-not $displayName) {
+                    $displayName = $pkg.Name -replace '^Microsoft\.', '' -replace '_.*$', ''
+                    # Add spaces between camelCase words only if it's CamelCase
+                    if ($displayName -cmatch '[a-z][A-Z]') {
+                        $displayName = $displayName -replace '([a-z])([A-Z])', '$1 $2'
                     }
                 }
 
-                # Clean up name
-                $name = $displayName -replace '^Microsoft\.', '' -replace '_.*$', '' -replace '([a-z])([A-Z])', '$1 $2'
+                $name = $displayName.Trim()
 
-                if ($name -and $pkg.InstallLocation) {
+                if ($name -and $pkg.InstallLocation -and $name.Length -gt 2) {
                     $launchCmd = "explorer.exe shell:AppsFolder\$($pkg.PackageFamilyName)!App"
                     $games += Write-GameInfo -Name $name -Platform "Xbox" -Path $pkg.InstallLocation -LaunchCommand $launchCmd
                     Write-Verbose "Found Xbox game: $name"
