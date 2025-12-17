@@ -260,10 +260,11 @@ function Get-GameHash {
     param(
         [string]$Name,
         [string]$Path,
-        [string]$Platform
+        [string]$Platform,
+        [string]$LaunchCommand
     )
 
-    $str = "$Name|$Path|$Platform"
+    $str = "$Name|$Path|$Platform|$LaunchCommand"
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($str)
     $sha = [System.Security.Cryptography.SHA256]::Create()
     $hash = $sha.ComputeHash($bytes)
@@ -285,7 +286,7 @@ function Write-GameInfo {
         Path = $Path
         LaunchCommand = $LaunchCommand
         Verified = $Verified
-        Hash = Get-GameHash -Name $Name -Path $Path -Platform $Platform
+        Hash = Get-GameHash -Name $Name -Path $Path -Platform $Platform -LaunchCommand $LaunchCommand
     }
 }
 
@@ -2085,6 +2086,10 @@ function Update-GameLaunchers {
     $updated = 0
     $unchanged = 0
     $skipped = 0
+    $removed = 0
+
+    # Track all expected filenames for orphan cleanup
+    $expectedFiles = @{}
 
     foreach ($game in $Games) {
         # Skip unverified games if IgnoreUnverified is set
@@ -2096,18 +2101,31 @@ function Update-GameLaunchers {
             continue
         }
 
-        $hash = $game.Hash
-        $wasVerified = $State[$hash].Verified
-        $existed = $State.ContainsKey($hash)
+        # Generate filename (must match New-GameLauncher)
+        $safeName = Get-SanitizedFileName -Name $game.Name
+        $fileName = "$safeName ($($game.Platform)).bat"
+        $targetDir = if ($game.Verified) { $OutputDirectory } else { Join-Path $OutputDirectory "Unverified" }
+        $filePath = Join-Path $targetDir $fileName
 
-        if ($existed -and $wasVerified -eq $game.Verified) {
+        # Track this file as expected
+        $expectedFiles[$filePath] = $true
+
+        $hash = $game.Hash
+        $stateMatches = $State.ContainsKey($hash)
+        $fileExists = Test-Path $filePath
+
+        # If hash matches state AND file exists, nothing to do
+        if ($stateMatches -and $fileExists) {
             $unchanged++
             continue
         }
 
-        $filePath = New-GameLauncher -Game $game -OutputDirectory $OutputDirectory -DryRun:$DryRun
+        # Determine if this is an update (file exists) or new creation
+        $isUpdate = $fileExists
 
-        if ($existed) {
+        $createdPath = New-GameLauncher -Game $game -OutputDirectory $OutputDirectory -DryRun:$DryRun
+
+        if ($isUpdate) {
             $updated++
             Write-Host "    [UPD]  " -ForegroundColor Yellow -NoNewline
             Write-Host "$($game.Name) " -ForegroundColor White -NoNewline
@@ -2119,13 +2137,55 @@ function Update-GameLaunchers {
             Write-Host "($($game.Platform))" -ForegroundColor DarkGray
         }
 
-        # Update state
+        # Update state with new hash
         $State[$hash] = @{
             Name = $game.Name
             Platform = $game.Platform
             Path = $game.Path
+            LaunchCommand = $game.LaunchCommand
             Verified = $game.Verified
+            FileName = $fileName
             LastUpdated = (Get-Date).ToString('o')
+        }
+    }
+
+    # Remove orphaned .bat files (files that exist but aren't in expected list)
+    if ($OutputDirectory -and -not $DryRun) {
+        $existingFiles = @()
+        if (Test-Path $OutputDirectory) {
+            $existingFiles += Get-ChildItem -Path $OutputDirectory -Filter "*.bat" -File -ErrorAction SilentlyContinue
+        }
+        $unverifiedDir = Join-Path $OutputDirectory "Unverified"
+        if (Test-Path $unverifiedDir) {
+            $existingFiles += Get-ChildItem -Path $unverifiedDir -Filter "*.bat" -File -ErrorAction SilentlyContinue
+        }
+
+        foreach ($file in $existingFiles) {
+            if (-not $expectedFiles.ContainsKey($file.FullName)) {
+                Remove-Item -Path $file.FullName -Force -ErrorAction SilentlyContinue
+                $removed++
+                Write-Host "    [DEL]  " -ForegroundColor Red -NoNewline
+                Write-Host "$($file.Name)" -ForegroundColor DarkGray
+            }
+        }
+
+        # Clean up old state entries that no longer have corresponding games
+        $hashesToRemove = @()
+        foreach ($hash in $State.Keys) {
+            $stateEntry = $State[$hash]
+            if ($stateEntry -and $stateEntry.FileName) {
+                $stateFilePath = if ($stateEntry.Verified) {
+                    Join-Path $OutputDirectory $stateEntry.FileName
+                } else {
+                    Join-Path $unverifiedDir $stateEntry.FileName
+                }
+                if (-not $expectedFiles.ContainsKey($stateFilePath)) {
+                    $hashesToRemove += $hash
+                }
+            }
+        }
+        foreach ($hash in $hashesToRemove) {
+            $State.Remove($hash)
         }
     }
 
@@ -2134,6 +2194,7 @@ function Update-GameLaunchers {
         Updated = $updated
         Unchanged = $unchanged
         Skipped = $skipped
+        Removed = $removed
     }
 }
 
@@ -2419,6 +2480,10 @@ Write-Host "$($results.Unchanged) launchers" -ForegroundColor DarkGray
 if ($results.Skipped -gt 0) {
     Write-Host "    Skipped:   " -ForegroundColor Gray -NoNewline
     Write-Host "$($results.Skipped) unverified" -ForegroundColor DarkYellow
+}
+if ($results.Removed -gt 0) {
+    Write-Host "    Removed:   " -ForegroundColor Gray -NoNewline
+    Write-Host "$($results.Removed) orphaned" -ForegroundColor Red
 }
 Write-Host ""
 if (-not $DryRun -and $OutputDirectory) {
