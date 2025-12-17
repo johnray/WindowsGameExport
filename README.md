@@ -255,16 +255,15 @@ Games from dedicated gaming platforms are automatically trusted:
 
 Items from general sources (WindowsApps, filesystem scan) require online verification.
 
-### DuckDuckGo Search (Primary)
-- Queries DuckDuckGo Instant Answer API
-- Checks if the item is described as a video game
-- Also checks for non-game indicators (browser, utility, driver, etc.)
+### Wikipedia Search (Primary)
+- Searches Wikipedia for the item name
+- Simple check: Does the Wikipedia result mention "game"?
+- If yes → it's a game. If no → it's not a game.
 - Free, no API key required
 
-### Wikipedia API (Secondary)
-- Queries Wikipedia for the item name
+### Wikipedia Page Lookup (Secondary)
+- Directly fetches the Wikipedia page for the item
 - Checks page categories for video game indicators
-- Also checks page extract text for game/non-game patterns
 - Categories: "video games", "Windows games", "PC games", etc.
 - Free, no API key required
 
@@ -276,8 +275,8 @@ Items from general sources (WindowsApps, filesystem scan) require online verific
 
 ### Verification Logic
 1. If from trusted gaming platform → auto-verified
-2. Query DuckDuckGo for game/non-game indicators
-3. Query Wikipedia for categories and content
+2. Search Wikipedia - does the result mention "game"?
+3. Lookup Wikipedia page categories
 4. Query RAWG API (if key provided)
 5. If all methods inconclusive → mark as unverified (placed in Unverified subfolder)
 

@@ -1185,103 +1185,48 @@ function Get-FilesystemGames {
 
 #region Verification Functions
 
-function Test-WebSearchGame {
-    [CmdletBinding()]
-    param(
-        [string]$Name
-    )
+function Test-WikipediaSearch {
+    # Simple: Search Wikipedia for "[name]" and check if "game" appears prominently
+    param([string]$Name)
 
-    # Use DuckDuckGo Instant Answer API to check if this is described as a game
     $normalized = Get-NormalizedGameName -Name $Name
     $encoded = [System.Web.HttpUtility]::UrlEncode($normalized)
 
-    $url = "https://api.duckduckgo.com/?q=$encoded&format=json&no_html=1&skip_disambig=1"
+    # Search Wikipedia for the name
+    $url = "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=$encoded&srlimit=3&format=json"
 
     try {
         $response = Invoke-RestMethod -Uri $url -Method Get -TimeoutSec 10 -ErrorAction Stop
 
-        # Check Abstract and AbstractText only (not related topics which are too broad)
-        $textToCheck = @(
-            $response.Abstract,
-            $response.AbstractText
-        ) -join ' '
+        if ($response.query.search.Count -gt 0) {
+            $nameLower = $normalized.ToLower()
 
-        # Skip if no meaningful content
-        if ([string]::IsNullOrWhiteSpace($textToCheck)) {
-            return $null
-        }
+            foreach ($result in $response.query.search) {
+                $title = $result.title
+                $titleLower = $title.ToLower()
 
-        # First check if it's explicitly NOT a game (utility, software, etc.)
-        # Do this first to avoid false positives from things like "game store"
-        $nonGameTerms = @(
-            'web browser', 'is a browser', 'internet browser',
-            'email client', 'email application', 'mail application',
-            'operating system', 'Linux distribution',
-            'software company', 'technology company', 'corporation',
-            'driver software', 'device driver', 'graphics driver',
-            'utility software', 'system utility', 'file manager',
-            'productivity software', 'office suite', 'word processor',
-            'antivirus', 'security software', 'malware',
-            'text editor', 'code editor', 'IDE',
-            'cloud storage', 'file synchronization', 'backup software',
-            'messaging app', 'chat application', 'communication platform',
-            'video conferencing', 'online meeting',
-            'digital distribution', 'app store', 'software distribution',
-            'control panel', 'settings app', 'configuration tool',
-            'photo editor', 'image editor', 'video editor',
-            'media player', 'music player', 'audio player',
-            'hardware', 'peripheral', 'motherboard', 'graphics card'
-        )
+                # Check if this result is about our item
+                if (-not $titleLower.Contains($nameLower.Split(' ')[0])) {
+                    continue
+                }
 
-        foreach ($term in $nonGameTerms) {
-            if ($textToCheck -match [regex]::Escape($term)) {
-                Write-Verbose "Web search found non-game term '$term' for '$Name'"
-                return $false
+                # Simple check: Does the title or snippet say "game"?
+                $snippet = $result.snippet -replace '<[^>]+>', ''
+                $combined = "$title $snippet"
+
+                if ($combined -match '\bgame\b') {
+                    Write-Verbose "Wikipedia: '$title' mentions game"
+                    return $true
+                } else {
+                    Write-Verbose "Wikipedia: '$title' does NOT mention game"
+                    return $false
+                }
             }
         }
 
-        # Check if it IS a game - use specific patterns that indicate the subject itself is a game
-        # Avoid terms like 'gaming' which appear in non-game contexts (gaming laptop, gaming mouse, etc.)
-        $gamePatterns = @(
-            'is a video game',
-            'is a computer game',
-            'is an action game',
-            'is an adventure game',
-            'is a role-playing game',
-            'is a shooter',
-            'is a platformer',
-            'is a strategy game',
-            'is a simulation game',
-            'is a racing game',
-            'is a puzzle game',
-            'is a fighting game',
-            'is a sports game',
-            'is a survival game',
-            'is an indie game',
-            'is a multiplayer',
-            'is a single-player',
-            'video game developed',
-            'video game published',
-            'action-adventure game',
-            'first-person shooter',
-            'third-person shooter',
-            'real-time strategy',
-            'turn-based strategy',
-            'roguelike', 'roguelite',
-            'metroidvania',
-            'developed by .+ and published by'
-        )
-
-        foreach ($pattern in $gamePatterns) {
-            if ($textToCheck -match $pattern) {
-                Write-Verbose "Web search found game pattern '$pattern' for '$Name'"
-                return $true
-            }
-        }
-
-        return $null  # Inconclusive
+        return $null
     } catch {
-        Write-Verbose "DuckDuckGo API error for '$Name': $_"
+        Write-Verbose "Wikipedia search error: $_"
         return $null
     }
 }
@@ -1488,20 +1433,18 @@ function Confirm-IsGame {
         # For now, do full verification for Xbox packages
     }
 
-    # Standalone games need verification
-    # Try DuckDuckGo search first (fast, no API key needed)
-    $webResult = Test-WebSearchGame -Name $GameName
+    # Search Wikipedia for "[name] video game" and check results
+    $searchResult = Test-WikipediaSearch -Name $GameName
     Start-Sleep -Milliseconds 300
 
-    if ($webResult -eq $true) {
+    if ($searchResult -eq $true) {
         return $true
     }
-    if ($webResult -eq $false) {
-        # Explicitly identified as NOT a game
+    if ($searchResult -eq $false) {
         return $false
     }
 
-    # Try Wikipedia (categories + content check)
+    # Try direct Wikipedia page lookup
     $wikiResult = Test-WikipediaGame -GameName $GameName
     Start-Sleep -Milliseconds 300
 
@@ -1509,11 +1452,10 @@ function Confirm-IsGame {
         return $true
     }
     if ($wikiResult -eq $false) {
-        # Explicitly identified as NOT a game
         return $false
     }
 
-    # Try RAWG if available and other methods were inconclusive
+    # Try RAWG if available
     if ($RawgApiKey) {
         $rawgResult = Test-RawgGame -GameName $GameName -ApiKey $RawgApiKey
         Start-Sleep -Milliseconds 300
