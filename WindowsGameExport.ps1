@@ -35,6 +35,16 @@
 .PARAMETER Exclude
     Array of directory paths to exclude from scanning (useful for large non-game directories).
 
+.PARAMETER IncludeList
+    Path to a text file containing game names to always include (one per line).
+    These games bypass verification and are always marked as verified.
+    Supports wildcards (*) for pattern matching.
+
+.PARAMETER ExcludeList
+    Path to a text file containing game names to always exclude (one per line).
+    These games are skipped entirely and no launchers are created for them.
+    Supports wildcards (*) for pattern matching.
+
 .EXAMPLE
     .\WindowsGameExport.ps1 -Drives "C:", "D:" -OutputDirectory "C:\GameLaunchers"
 
@@ -43,6 +53,9 @@
 
 .EXAMPLE
     .\WindowsGameExport.ps1 -IncludeFilesystemScan -Exclude "D:\Media", "D:\Documents", "E:\Backup"
+
+.EXAMPLE
+    .\WindowsGameExport.ps1 -OutputDirectory "C:\GameLaunchers" -IncludeList "_include.txt" -ExcludeList "_exclude.txt"
 #>
 
 [CmdletBinding()]
@@ -72,7 +85,13 @@ param(
     [string]$ConfigFile,
 
     [Parameter()]
-    [string[]]$Exclude
+    [string[]]$Exclude,
+
+    [Parameter()]
+    [string]$IncludeList,
+
+    [Parameter()]
+    [string]$ExcludeList
 )
 
 #region Welcome Screen
@@ -266,6 +285,80 @@ function Write-GameInfo {
         Verified = $Verified
         Hash = Get-GameHash -Name $Name -Path $Path -Platform $Platform
     }
+}
+
+function Read-GameList {
+    <#
+    .SYNOPSIS
+        Read a list of game names from a text file
+    .DESCRIPTION
+        Reads a text file containing game names (one per line).
+        Supports comments (lines starting with #) and wildcards (*).
+        Empty lines are ignored.
+    #>
+    param(
+        [string]$FilePath
+    )
+
+    if (-not $FilePath -or -not (Test-Path $FilePath)) {
+        return @()
+    }
+
+    $patterns = @()
+    try {
+        $lines = Get-Content -Path $FilePath -ErrorAction Stop
+        foreach ($line in $lines) {
+            $line = $line.Trim()
+            # Skip empty lines and comments
+            if ($line -and -not $line.StartsWith('#')) {
+                $patterns += $line
+            }
+        }
+        Write-Verbose "Loaded $($patterns.Count) entries from $FilePath"
+    } catch {
+        Write-Warning "Could not read list file '$FilePath': $_"
+    }
+
+    return $patterns
+}
+
+function Test-GameMatchesList {
+    <#
+    .SYNOPSIS
+        Check if a game name matches any pattern in a list
+    .DESCRIPTION
+        Compares game name against patterns. Supports wildcards (*).
+        Matching is case-insensitive.
+    #>
+    param(
+        [string]$GameName,
+        [string[]]$Patterns
+    )
+
+    if (-not $Patterns -or $Patterns.Count -eq 0) {
+        return $false
+    }
+
+    $nameLower = $GameName.ToLower()
+
+    foreach ($pattern in $Patterns) {
+        $patternLower = $pattern.ToLower()
+
+        # Convert wildcard pattern to regex
+        if ($pattern.Contains('*')) {
+            $regexPattern = '^' + [regex]::Escape($patternLower).Replace('\*', '.*') + '$'
+            if ($nameLower -match $regexPattern) {
+                return $true
+            }
+        } else {
+            # Exact match (case-insensitive)
+            if ($nameLower -eq $patternLower) {
+                return $true
+            }
+        }
+    }
+
+    return $false
 }
 
 #endregion
@@ -2079,6 +2172,10 @@ if ($ConfigFile -and (Test-Path $ConfigFile) -and -not $DryRun) {
     }
 }
 
+# Load include/exclude lists
+$includePatterns = Read-GameList -FilePath $IncludeList
+$excludePatterns = Read-GameList -FilePath $ExcludeList
+
 # Display header
 Write-Host ""
 Write-Host "  ============================================================" -ForegroundColor Cyan
@@ -2092,6 +2189,12 @@ if (-not $DryRun -and $OutputDirectory) {
 }
 if ($Exclude) {
     Write-Host "    Exclude: $($Exclude -join ', ')" -ForegroundColor DarkYellow
+}
+if ($includePatterns.Count -gt 0) {
+    Write-Host "    Include List: $($includePatterns.Count) patterns from $IncludeList" -ForegroundColor Green
+}
+if ($excludePatterns.Count -gt 0) {
+    Write-Host "    Exclude List: $($excludePatterns.Count) patterns from $ExcludeList" -ForegroundColor Yellow
 }
 if ($DryRun) {
     Write-Host "    Mode:    DRY RUN (no files will be created)" -ForegroundColor Yellow
@@ -2177,11 +2280,29 @@ foreach ($game in $allGames) {
 }
 $allGames = $uniqueGames
 
+# Apply exclude list - remove games matching exclude patterns
+$excludedCount = 0
+if ($excludePatterns.Count -gt 0) {
+    $filteredGames = @()
+    foreach ($game in $allGames) {
+        if (Test-GameMatchesList -GameName $game.Name -Patterns $excludePatterns) {
+            $excludedCount++
+            Write-Verbose "Excluded by list: $($game.Name)"
+        } else {
+            $filteredGames += $game
+        }
+    }
+    $allGames = $filteredGames
+}
+
 Write-Host "  ------------------------------------------------------------" -ForegroundColor DarkGray
 Write-Host "    TOTAL" -ForegroundColor White -NoNewline
 $totalMsg = "$($allGames.Count) potential games"
-if ($duplicatesRemoved -gt 0) {
-    $totalMsg += " ($duplicatesRemoved duplicates removed)"
+if ($duplicatesRemoved -gt 0 -or $excludedCount -gt 0) {
+    $notes = @()
+    if ($duplicatesRemoved -gt 0) { $notes += "$duplicatesRemoved duplicates" }
+    if ($excludedCount -gt 0) { $notes += "$excludedCount excluded" }
+    $totalMsg += " ($($notes -join ', ') removed)"
 }
 Write-Host "               $totalMsg" -ForegroundColor Cyan
 Write-Host ""
@@ -2199,8 +2320,16 @@ if (-not $SkipVerification -and $allGames.Count -gt 0) {
 
     foreach ($game in $allGames) {
         $currentIndex++
+        $includeListMatch = $false
+
+        # Check include list first - games in include list are auto-verified
+        if ($includePatterns.Count -gt 0 -and (Test-GameMatchesList -GameName $game.Name -Patterns $includePatterns)) {
+            $isVerified = $true
+            $includeListMatch = $true
+            Write-Verbose "Include list match - auto-verified: $($game.Name)"
+        }
         # Xbox games from XboxGames folder are trusted (Game Pass games)
-        if ($game.Platform -eq 'Xbox' -and $game.Path -match '\\XboxGames\\') {
+        elseif ($game.Platform -eq 'Xbox' -and $game.Path -match '\\XboxGames\\') {
             $isVerified = $true
             Write-Verbose "Xbox Game Pass (XboxGames folder) - auto-verified"
         } else {
@@ -2214,7 +2343,11 @@ if (-not $SkipVerification -and $allGames.Count -gt 0) {
         if ($isVerified) {
             $verified++
             Write-Host "    $progress" -ForegroundColor DarkGray -NoNewline
-            Write-Host "[OK] " -ForegroundColor Green -NoNewline
+            if ($includeListMatch) {
+                Write-Host "[+L] " -ForegroundColor Cyan -NoNewline
+            } else {
+                Write-Host "[OK] " -ForegroundColor Green -NoNewline
+            }
             Write-Host "$($game.Name)" -ForegroundColor White
         } else {
             $unverified++

@@ -1,0 +1,33 @@
+# Include List Example for WindowsGameExport
+# ============================================
+# Games listed here will bypass verification and always be marked as verified.
+# This is useful for:
+#   - Indie games that may not have Wikipedia/IGN entries
+#   - Games with unusual names that fail verification
+#   - Custom games or mods you want to include
+#
+# Format: One game name per line
+# - Lines starting with # are comments
+# - Empty lines are ignored
+# - Wildcards (*) are supported for pattern matching
+# - Matching is case-insensitive
+#
+# Examples:
+
+# Exact match - game must have this exact name
+My Custom Game
+Obscure Indie Title
+
+# Wildcard examples
+Herdling*
+*Simulator 2024
+My Game*
+
+# Pattern matching for series
+Call of Duty*
+Final Fantasy*
+The Elder Scrolls*
+
+# Match anything containing a word
+*Roguelike*
+*Dungeon*

@@ -95,6 +95,22 @@ Array of directory paths to exclude from filesystem scanning. Useful for skippin
 .\WindowsGameExport.ps1 -IncludeFilesystemScan -Exclude "D:\Media", "D:\Documents", "E:\Backup"
 ```
 
+### `-IncludeList`
+Path to a text file containing game names to always include and auto-verify. Games matching patterns in this file bypass online verification. Supports wildcards (*).
+
+```powershell
+.\WindowsGameExport.ps1 -OutputDirectory "C:\GameLaunchers" -IncludeList "_include.txt"
+```
+
+### `-ExcludeList`
+Path to a text file containing game names to always exclude. Games matching patterns in this file are skipped entirely. Supports wildcards (*).
+
+```powershell
+.\WindowsGameExport.ps1 -OutputDirectory "C:\GameLaunchers" -ExcludeList "_exclude.txt"
+```
+
+See `_include.example.txt` and `_exclude.example.txt` for file format examples.
+
 ### `-SkipVerification`
 Skip online verification and trust all detected games. Faster but may include non-games.
 
@@ -328,6 +344,31 @@ Items from general sources (WindowsApps, filesystem scan) require online verific
 ```powershell
 # Re-run to update - only changed/new games will be processed
 .\WindowsGameExport.ps1 -OutputDirectory "C:\GameLaunchers"
+```
+
+### Custom Include/Exclude Lists
+```powershell
+# Use custom lists to control what gets included/excluded
+.\WindowsGameExport.ps1 `
+    -OutputDirectory "C:\GameLaunchers" `
+    -IncludeList "my_games.txt" `
+    -ExcludeList "skip_these.txt"
+```
+
+Example `my_games.txt`:
+```
+# Force-include these indie games that may not have Wikipedia entries
+Herdling
+My Custom Game
+*Roguelike*
+```
+
+Example `skip_these.txt`:
+```
+# Skip these apps that keep being detected
+Microsoft Edge
+*Demo*
+*Beta*
 ```
 
 ## Advanced Usage

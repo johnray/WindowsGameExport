@@ -1,0 +1,34 @@
+# Exclude List Example for WindowsGameExport
+# ============================================
+# Games listed here will be completely skipped - no launchers created.
+# This is useful for:
+#   - Apps that keep being detected as games
+#   - Games you don't want launchers for
+#   - Test/demo applications
+#
+# Format: One game name per line
+# - Lines starting with # are comments
+# - Empty lines are ignored
+# - Wildcards (*) are supported for pattern matching
+# - Matching is case-insensitive
+#
+# Examples:
+
+# Exact match - skip this specific item
+Microsoft Edge
+Microsoft Teams
+Spotify
+
+# Wildcard examples - skip anything matching pattern
+*Demo*
+*Beta*
+*Test*
+
+# Skip entire series
+Candy Crush*
+FarmVille*
+
+# Skip apps with certain words
+*Trial*
+*Benchmark*
+*Launcher*
