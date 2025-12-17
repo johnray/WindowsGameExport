@@ -725,9 +725,10 @@ function Get-XboxGames {
 
         foreach ($pkg in $packages) {
             try {
-                # Get display name from manifest
+                # Get display name and App ID from manifest
                 $manifestPath = Join-Path $pkg.InstallLocation "AppxManifest.xml"
                 $displayName = $null
+                $appId = "App"  # Default fallback
 
                 if (Test-Path $manifestPath) {
                     try {
@@ -735,6 +736,16 @@ function Get-XboxGames {
                         $rawDisplayName = $manifest.Package.Properties.DisplayName
                         if ($rawDisplayName -and $rawDisplayName -notmatch '^ms-resource:') {
                             $displayName = $rawDisplayName
+                        }
+                        # Get the actual Application ID from the manifest
+                        $appElement = $manifest.Package.Applications.Application
+                        if ($appElement) {
+                            # Handle both single app and array of apps
+                            if ($appElement -is [array]) {
+                                $appId = $appElement[0].Id
+                            } else {
+                                $appId = $appElement.Id
+                            }
                         }
                     } catch {}
                 }
@@ -751,7 +762,7 @@ function Get-XboxGames {
                 $name = $displayName.Trim()
 
                 if ($name -and $pkg.InstallLocation -and $name.Length -gt 2) {
-                    $launchCmd = "explorer.exe shell:AppsFolder\$($pkg.PackageFamilyName)!App"
+                    $launchCmd = "start `"`" shell:AppsFolder\$($pkg.PackageFamilyName)!$appId"
                     $games += Write-GameInfo -Name $name -Platform "Xbox" -Path $pkg.InstallLocation -LaunchCommand $launchCmd
                     Write-Verbose "Found Xbox game: $name"
                 }
@@ -798,19 +809,20 @@ function Get-XboxGames {
                         }
 
                         $packageName = $manifest.Package.Identity.Name
-                        $appId = $manifest.Package.Applications.Application.Id
+                        $appElement = $manifest.Package.Applications.Application
+                        $appId = if ($appElement -is [array]) { $appElement[0].Id } else { $appElement.Id }
 
                         if ($displayName -and $displayName.Length -gt 2) {
-                            # Xbox Game Pass games use a special launch method
-                            # shell:AppsFolder\PackageFamilyName!AppId
-                            $publisher = $manifest.Package.Identity.Publisher
-                            # Extract publisher hash (simplified - real hash is more complex)
-                            $publisherHash = ($publisher -replace '[^a-zA-Z0-9]', '').Substring(0, [Math]::Min(13, ($publisher -replace '[^a-zA-Z0-9]', '').Length))
-
-                            $launchCmd = "explorer.exe shell:AppsFolder\$packageName`_$publisherHash!$appId"
-
-                            $games += Write-GameInfo -Name $displayName -Platform "Xbox" -Path $gameFolder.FullName -LaunchCommand $launchCmd
-                            Write-Verbose "Found Xbox game (XboxGames folder): $displayName"
+                            # Look up the actual PackageFamilyName from Get-AppxPackage
+                            # The publisher hash is cryptographically derived - we can't compute it
+                            $installedPkg = Get-AppxPackage -Name $packageName -ErrorAction SilentlyContinue
+                            if ($installedPkg) {
+                                $launchCmd = "start `"`" shell:AppsFolder\$($installedPkg.PackageFamilyName)!$appId"
+                                $games += Write-GameInfo -Name $displayName -Platform "Xbox" -Path $gameFolder.FullName -LaunchCommand $launchCmd
+                                Write-Verbose "Found Xbox game (XboxGames folder): $displayName"
+                            } else {
+                                Write-Verbose "Could not find installed package for: $displayName"
+                            }
                         }
                     } catch {
                         Write-Verbose "Error parsing manifest in $($gameFolder.Name): $_"

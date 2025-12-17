@@ -219,7 +219,7 @@ start "" "steam://rungameid/1091500"
 | Steam | `steam://rungameid/<appid>` protocol |
 | Epic Games | `com.epicgames.launcher://apps/<id>?action=launch&silent=true` protocol |
 | GOG Galaxy | `GalaxyClient.exe /command=runGame /gameId=<id>` or direct executable |
-| Xbox/Microsoft | `explorer.exe shell:AppsFolder\<PackageFamilyName>!App` |
+| Xbox/Microsoft | `start "" shell:AppsFolder\<PackageFamilyName>!<AppId>` |
 | Amazon Games | Direct executable launch |
 | EA/Origin | Direct executable launch |
 | Ubisoft Connect | Direct executable launch |
