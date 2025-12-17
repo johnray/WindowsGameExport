@@ -257,14 +257,15 @@ function Get-NormalizedGameName {
 }
 
 function Get-GameHash {
+    # Hash based on identity only (Name|Path|Platform)
+    # Content changes (LaunchCommand, Verified) are compared separately
     param(
         [string]$Name,
         [string]$Path,
-        [string]$Platform,
-        [string]$LaunchCommand
+        [string]$Platform
     )
 
-    $str = "$Name|$Path|$Platform|$LaunchCommand"
+    $str = "$Name|$Path|$Platform"
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($str)
     $sha = [System.Security.Cryptography.SHA256]::Create()
     $hash = $sha.ComputeHash($bytes)
@@ -286,7 +287,7 @@ function Write-GameInfo {
         Path = $Path
         LaunchCommand = $LaunchCommand
         Verified = $Verified
-        Hash = Get-GameHash -Name $Name -Path $Path -Platform $Platform -LaunchCommand $LaunchCommand
+        Hash = Get-GameHash -Name $Name -Path $Path -Platform $Platform
     }
 }
 
@@ -2088,8 +2089,8 @@ function Update-GameLaunchers {
     $skipped = 0
     $removed = 0
 
-    # Track all expected filenames for orphan cleanup
-    $expectedFiles = @{}
+    # Track all expected filenames for orphan cleanup (case-insensitive for Windows paths)
+    $expectedFiles = [System.Collections.Generic.Dictionary[string,bool]]::new([System.StringComparer]::OrdinalIgnoreCase)
 
     foreach ($game in $Games) {
         # Skip unverified games if IgnoreUnverified is set
@@ -2111,11 +2112,18 @@ function Update-GameLaunchers {
         $expectedFiles[$filePath] = $true
 
         $hash = $game.Hash
-        $stateMatches = $State.ContainsKey($hash)
+        $stateEntry = $State[$hash]
         $fileExists = Test-Path $filePath
 
-        # If hash matches state AND file exists, nothing to do
-        if ($stateMatches -and $fileExists) {
+        # Check if content has changed (LaunchCommand or Verified status)
+        $contentMatches = $false
+        if ($stateEntry) {
+            $contentMatches = ($stateEntry.LaunchCommand -eq $game.LaunchCommand) -and
+                              ($stateEntry.Verified -eq $game.Verified)
+        }
+
+        # If identity matches state AND content matches AND file exists, nothing to do
+        if ($stateEntry -and $contentMatches -and $fileExists) {
             $unchanged++
             continue
         }
