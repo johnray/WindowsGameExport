@@ -85,53 +85,45 @@ function Show-WelcomeScreen {
 
     Clear-Host
 
-    # ASCII Art Banner
+    # ASCII Art Banner (ASCII-safe)
     Write-Host ""
-    Write-Host "  ██╗    ██╗██╗███╗   ██╗██████╗  ██████╗ ██╗    ██╗███████╗" -ForegroundColor Cyan
-    Write-Host "  ██║    ██║██║████╗  ██║██╔══██╗██╔═══██╗██║    ██║██╔════╝" -ForegroundColor Cyan
-    Write-Host "  ██║ █╗ ██║██║██╔██╗ ██║██║  ██║██║   ██║██║ █╗ ██║███████╗" -ForegroundColor Cyan
-    Write-Host "  ██║███╗██║██║██║╚██╗██║██║  ██║██║   ██║██║███╗██║╚════██║" -ForegroundColor Cyan
-    Write-Host "  ╚███╔███╔╝██║██║ ╚████║██████╔╝╚██████╔╝╚███╔███╔╝███████║" -ForegroundColor Cyan
-    Write-Host "   ╚══╝╚══╝ ╚═╝╚═╝  ╚═══╝╚═════╝  ╚═════╝  ╚══╝╚══╝ ╚══════╝" -ForegroundColor Cyan
+    Write-Host "  __        ___           _                    " -ForegroundColor Cyan
+    Write-Host "  \ \      / (_)_ __   __| | _____      _____  " -ForegroundColor Cyan
+    Write-Host "   \ \ /\ / /| | '_ \ / _`` |/ _ \ \ /\ / / __| " -ForegroundColor Cyan
+    Write-Host "    \ V  V / | | | | | (_| | (_) \ V  V /\__ \ " -ForegroundColor Cyan
+    Write-Host "     \_/\_/  |_|_| |_|\__,_|\___/ \_/\_/ |___/ " -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "   ██████╗  █████╗ ███╗   ███╗███████╗" -ForegroundColor Magenta
-    Write-Host "  ██╔════╝ ██╔══██╗████╗ ████║██╔════╝" -ForegroundColor Magenta
-    Write-Host "  ██║  ███╗███████║██╔████╔██║█████╗  " -ForegroundColor Magenta
-    Write-Host "  ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝  " -ForegroundColor Magenta
-    Write-Host "  ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗" -ForegroundColor Magenta
-    Write-Host "   ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝" -ForegroundColor Magenta
-    Write-Host ""
-    Write-Host "  ███████╗██╗  ██╗██████╗  ██████╗ ██████╗ ████████╗" -ForegroundColor Yellow
-    Write-Host "  ██╔════╝╚██╗██╔╝██╔══██╗██╔═══██╗██╔══██╗╚══██╔══╝" -ForegroundColor Yellow
-    Write-Host "  █████╗   ╚███╔╝ ██████╔╝██║   ██║██████╔╝   ██║   " -ForegroundColor Yellow
-    Write-Host "  ██╔══╝   ██╔██╗ ██╔═══╝ ██║   ██║██╔══██╗   ██║   " -ForegroundColor Yellow
-    Write-Host "  ███████╗██╔╝ ██╗██║     ╚██████╔╝██║  ██║   ██║   " -ForegroundColor Yellow
-    Write-Host "  ╚══════╝╚═╝  ╚═╝╚═╝      ╚═════╝ ╚═╝  ╚═╝   ╚═╝   " -ForegroundColor Yellow
+    Write-Host "    ____                         _____                       _   " -ForegroundColor Magenta
+    Write-Host "   / ___| __ _ _ __ ___   ___   | ____|_  ___ __   ___  _ __| |_ " -ForegroundColor Magenta
+    Write-Host "  | |  _ / _`` | '_ `` _ \ / _ \  |  _| \ \/ / '_ \ / _ \| '__| __|" -ForegroundColor Magenta
+    Write-Host "  | |_| | (_| | | | | | |  __/  | |___ >  <| |_) | (_) | |  | |_ " -ForegroundColor Magenta
+    Write-Host "   \____|\__,_|_| |_| |_|\___|  |_____/_/\_\ .__/ \___/|_|   \__|" -ForegroundColor Magenta
+    Write-Host "                                           |_|                   " -ForegroundColor Magenta
     Write-Host ""
 
     # Tagline
-    Write-Host "  ╔════════════════════════════════════════════════════════════════╗" -ForegroundColor Magenta
-    Write-Host "  ║   Detect games across all platforms & generate launcher files  ║" -ForegroundColor Magenta
-    Write-Host "  ╚════════════════════════════════════════════════════════════════╝" -ForegroundColor Magenta
+    Write-Host "  +==================================================================+" -ForegroundColor Magenta
+    Write-Host "  |   Detect games across all platforms & generate launcher files   |" -ForegroundColor Magenta
+    Write-Host "  +==================================================================+" -ForegroundColor Magenta
     Write-Host ""
 
     # Supported Platforms
-    Write-Host "  ┌────────────────────────────────────────────────────────────────┐" -ForegroundColor DarkGray
-    Write-Host "  │  SUPPORTED PLATFORMS                                           │" -ForegroundColor Yellow
-    Write-Host "  │                                                                │" -ForegroundColor DarkGray
-    Write-Host "  │    ◆ Steam              ◆ Xbox Game Pass / MS Store            │" -ForegroundColor White
-    Write-Host "  │    ◆ Epic Games Store   ◆ Amazon Games                         │" -ForegroundColor White
-    Write-Host "  │    ◆ GOG Galaxy         ◆ EA App / Origin                      │" -ForegroundColor White
-    Write-Host "  │    ◆ Ubisoft Connect    ◆ Battle.net                           │" -ForegroundColor White
-    Write-Host "  │    ◆ Standalone Games (filesystem scan with engine detection)  │" -ForegroundColor White
-    Write-Host "  │                                                                │" -ForegroundColor DarkGray
-    Write-Host "  └────────────────────────────────────────────────────────────────┘" -ForegroundColor DarkGray
+    Write-Host "  +------------------------------------------------------------------+" -ForegroundColor DarkGray
+    Write-Host "  |  SUPPORTED PLATFORMS                                             |" -ForegroundColor Yellow
+    Write-Host "  |                                                                  |" -ForegroundColor DarkGray
+    Write-Host "  |    * Steam              * Xbox Game Pass / MS Store              |" -ForegroundColor White
+    Write-Host "  |    * Epic Games Store   * Amazon Games                           |" -ForegroundColor White
+    Write-Host "  |    * GOG Galaxy         * EA App / Origin                        |" -ForegroundColor White
+    Write-Host "  |    * Ubisoft Connect    * Battle.net                             |" -ForegroundColor White
+    Write-Host "  |    * Standalone Games (filesystem scan with engine detection)   |" -ForegroundColor White
+    Write-Host "  |                                                                  |" -ForegroundColor DarkGray
+    Write-Host "  +------------------------------------------------------------------+" -ForegroundColor DarkGray
     Write-Host ""
 
     # Quick Start
-    Write-Host "  ╭────────────────────────────────────────────────────────────────╮" -ForegroundColor Cyan
-    Write-Host "  │  QUICK START                                                   │" -ForegroundColor Yellow
-    Write-Host "  ╰────────────────────────────────────────────────────────────────╯" -ForegroundColor Cyan
+    Write-Host "  +------------------------------------------------------------------+" -ForegroundColor Cyan
+    Write-Host "  |  QUICK START                                                     |" -ForegroundColor Yellow
+    Write-Host "  +------------------------------------------------------------------+" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "  Preview what games would be found (no files created):" -ForegroundColor DarkGray
     Write-Host '    .\WindowsGameExport.ps1 -DryRun' -ForegroundColor Green
@@ -150,42 +142,42 @@ function Show-WelcomeScreen {
     Write-Host ""
 
     # Parameters
-    Write-Host "  ╭────────────────────────────────────────────────────────────────╮" -ForegroundColor Cyan
-    Write-Host "  │  PARAMETERS                                                    │" -ForegroundColor Yellow
-    Write-Host "  ╰────────────────────────────────────────────────────────────────╯" -ForegroundColor Cyan
+    Write-Host "  +------------------------------------------------------------------+" -ForegroundColor Cyan
+    Write-Host "  |  PARAMETERS                                                      |" -ForegroundColor Yellow
+    Write-Host "  +------------------------------------------------------------------+" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "    -OutputDirectory      Where to create .bat launcher files" -ForegroundColor White
-    Write-Host "    -Drives               Specific drives to scan (default: all fixed)" -ForegroundColor DarkGray
-    Write-Host "    -DryRun               Preview without creating files" -ForegroundColor DarkGray
+    Write-Host "    -OutputDirectory        Where to create .bat launcher files" -ForegroundColor White
+    Write-Host "    -Drives                 Specific drives to scan (default: all fixed)" -ForegroundColor DarkGray
+    Write-Host "    -DryRun                 Preview without creating files" -ForegroundColor DarkGray
     Write-Host "    -IncludeFilesystemScan  Scan for standalone games" -ForegroundColor DarkGray
-    Write-Host "    -SkipVerification     Skip Wikipedia/IGN verification" -ForegroundColor DarkGray
-    Write-Host "    -IgnoreUnverified     Don't create launchers for unverified items" -ForegroundColor DarkGray
-    Write-Host "    -Exclude              Directories to skip during filesystem scan" -ForegroundColor DarkGray
-    Write-Host "    -RawgApiKey           Optional RAWG API key for better verification" -ForegroundColor DarkGray
-    Write-Host "    -ConfigFile           Custom state file path" -ForegroundColor DarkGray
+    Write-Host "    -SkipVerification       Skip Wikipedia/IGN verification" -ForegroundColor DarkGray
+    Write-Host "    -IgnoreUnverified       Don't create launchers for unverified items" -ForegroundColor DarkGray
+    Write-Host "    -Exclude                Directories to skip during filesystem scan" -ForegroundColor DarkGray
+    Write-Host "    -RawgApiKey             Optional RAWG API key for better verification" -ForegroundColor DarkGray
+    Write-Host "    -ConfigFile             Custom state file path" -ForegroundColor DarkGray
     Write-Host ""
 
     # Verification info
-    Write-Host "  ┌────────────────────────────────────────────────────────────────┐" -ForegroundColor DarkGray
-    Write-Host "  │  GAME VERIFICATION                                             │" -ForegroundColor Yellow
-    Write-Host "  │                                                                │" -ForegroundColor DarkGray
-    Write-Host "  │  Games from trusted platforms (Steam, Epic, GOG, etc.) are     │" -ForegroundColor White
-    Write-Host "  │  auto-verified. Xbox/MS Store items are verified via:          │" -ForegroundColor White
-    Write-Host "  │                                                                │" -ForegroundColor DarkGray
-    Write-Host "  │    1. Wikipedia API (searches for video game articles)         │" -ForegroundColor White
-    Write-Host "  │    2. IGN Game Database (checks for game pages)                │" -ForegroundColor White
-    Write-Host "  │    3. RAWG API (optional, requires free API key)               │" -ForegroundColor White
-    Write-Host "  │                                                                │" -ForegroundColor DarkGray
-    Write-Host "  │  Unverified items go to an 'Unverified' subfolder.             │" -ForegroundColor White
-    Write-Host "  │                                                                │" -ForegroundColor DarkGray
-    Write-Host "  └────────────────────────────────────────────────────────────────┘" -ForegroundColor DarkGray
+    Write-Host "  +------------------------------------------------------------------+" -ForegroundColor DarkGray
+    Write-Host "  |  GAME VERIFICATION                                               |" -ForegroundColor Yellow
+    Write-Host "  |                                                                  |" -ForegroundColor DarkGray
+    Write-Host "  |  Games from trusted platforms (Steam, Epic, GOG, etc.) are       |" -ForegroundColor White
+    Write-Host "  |  auto-verified. Xbox/MS Store items are verified via:            |" -ForegroundColor White
+    Write-Host "  |                                                                  |" -ForegroundColor DarkGray
+    Write-Host "  |    1. Wikipedia API (searches for video game articles)           |" -ForegroundColor White
+    Write-Host "  |    2. IGN Game Database (checks for game pages)                  |" -ForegroundColor White
+    Write-Host "  |    3. RAWG API (optional, requires free API key)                 |" -ForegroundColor White
+    Write-Host "  |                                                                  |" -ForegroundColor DarkGray
+    Write-Host "  |  Unverified items go to an 'Unverified' subfolder.               |" -ForegroundColor White
+    Write-Host "  |                                                                  |" -ForegroundColor DarkGray
+    Write-Host "  +------------------------------------------------------------------+" -ForegroundColor DarkGray
     Write-Host ""
 
     # Footer
-    Write-Host "  ════════════════════════════════════════════════════════════════" -ForegroundColor DarkGray
+    Write-Host "  ====================================================================" -ForegroundColor DarkGray
     Write-Host "  For help: Get-Help .\WindowsGameExport.ps1 -Full" -ForegroundColor DarkGray
     Write-Host "  GitHub: https://github.com/johnray/WindowsGameExport" -ForegroundColor DarkGray
-    Write-Host "  ════════════════════════════════════════════════════════════════" -ForegroundColor DarkGray
+    Write-Host "  ====================================================================" -ForegroundColor DarkGray
     Write-Host ""
 }
 
