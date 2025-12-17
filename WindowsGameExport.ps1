@@ -172,6 +172,8 @@ function Show-WelcomeScreen {
     Write-Host "    -SkipVerification       Skip Wikipedia/IGN verification" -ForegroundColor DarkGray
     Write-Host "    -IgnoreUnverified       Don't create launchers for unverified items" -ForegroundColor DarkGray
     Write-Host "    -Exclude                Directories to skip during filesystem scan" -ForegroundColor DarkGray
+    Write-Host "    -IncludeList            Text file of game names to always include" -ForegroundColor DarkGray
+    Write-Host "    -ExcludeList            Text file of game names to always exclude" -ForegroundColor DarkGray
     Write-Host "    -RawgApiKey             Optional RAWG API key for better verification" -ForegroundColor DarkGray
     Write-Host "    -ConfigFile             Custom state file path" -ForegroundColor DarkGray
     Write-Host ""
