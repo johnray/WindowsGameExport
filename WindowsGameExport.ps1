@@ -5,8 +5,8 @@
 .DESCRIPTION
     This script detects games from Steam, Epic Games, GOG, Xbox Game Pass, Amazon Games,
     EA App/Origin, Ubisoft Connect, Battle.net, and optionally performs a filesystem scan
-    for standalone games. It verifies detected items are games using Wikipedia and RAWG APIs,
-    then generates .bat launcher files for each game.
+    for standalone games. It verifies detected items are games using Wikipedia, IGN, and
+    RAWG APIs, then generates .bat launcher files for each game.
 
 .PARAMETER Drives
     Array of drive letters to scan for games. Default: all fixed drives.
@@ -74,6 +74,129 @@ param(
     [Parameter()]
     [string[]]$Exclude
 )
+
+#region Welcome Screen
+
+function Show-WelcomeScreen {
+    <#
+    .SYNOPSIS
+        Display an interactive welcome screen when script is run without parameters
+    #>
+
+    Clear-Host
+
+    # ASCII Art Banner
+    Write-Host ""
+    Write-Host "  ██╗    ██╗██╗███╗   ██╗██████╗  ██████╗ ██╗    ██╗███████╗" -ForegroundColor Cyan
+    Write-Host "  ██║    ██║██║████╗  ██║██╔══██╗██╔═══██╗██║    ██║██╔════╝" -ForegroundColor Cyan
+    Write-Host "  ██║ █╗ ██║██║██╔██╗ ██║██║  ██║██║   ██║██║ █╗ ██║███████╗" -ForegroundColor Cyan
+    Write-Host "  ██║███╗██║██║██║╚██╗██║██║  ██║██║   ██║██║███╗██║╚════██║" -ForegroundColor Cyan
+    Write-Host "  ╚███╔███╔╝██║██║ ╚████║██████╔╝╚██████╔╝╚███╔███╔╝███████║" -ForegroundColor Cyan
+    Write-Host "   ╚══╝╚══╝ ╚═╝╚═╝  ╚═══╝╚═════╝  ╚═════╝  ╚══╝╚══╝ ╚══════╝" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "   ██████╗  █████╗ ███╗   ███╗███████╗" -ForegroundColor Magenta
+    Write-Host "  ██╔════╝ ██╔══██╗████╗ ████║██╔════╝" -ForegroundColor Magenta
+    Write-Host "  ██║  ███╗███████║██╔████╔██║█████╗  " -ForegroundColor Magenta
+    Write-Host "  ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝  " -ForegroundColor Magenta
+    Write-Host "  ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗" -ForegroundColor Magenta
+    Write-Host "   ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝" -ForegroundColor Magenta
+    Write-Host ""
+    Write-Host "  ███████╗██╗  ██╗██████╗  ██████╗ ██████╗ ████████╗" -ForegroundColor Yellow
+    Write-Host "  ██╔════╝╚██╗██╔╝██╔══██╗██╔═══██╗██╔══██╗╚══██╔══╝" -ForegroundColor Yellow
+    Write-Host "  █████╗   ╚███╔╝ ██████╔╝██║   ██║██████╔╝   ██║   " -ForegroundColor Yellow
+    Write-Host "  ██╔══╝   ██╔██╗ ██╔═══╝ ██║   ██║██╔══██╗   ██║   " -ForegroundColor Yellow
+    Write-Host "  ███████╗██╔╝ ██╗██║     ╚██████╔╝██║  ██║   ██║   " -ForegroundColor Yellow
+    Write-Host "  ╚══════╝╚═╝  ╚═╝╚═╝      ╚═════╝ ╚═╝  ╚═╝   ╚═╝   " -ForegroundColor Yellow
+    Write-Host ""
+
+    # Tagline
+    Write-Host "  ╔════════════════════════════════════════════════════════════════╗" -ForegroundColor Magenta
+    Write-Host "  ║   Detect games across all platforms & generate launcher files  ║" -ForegroundColor Magenta
+    Write-Host "  ╚════════════════════════════════════════════════════════════════╝" -ForegroundColor Magenta
+    Write-Host ""
+
+    # Supported Platforms
+    Write-Host "  ┌────────────────────────────────────────────────────────────────┐" -ForegroundColor DarkGray
+    Write-Host "  │  SUPPORTED PLATFORMS                                           │" -ForegroundColor Yellow
+    Write-Host "  │                                                                │" -ForegroundColor DarkGray
+    Write-Host "  │    ◆ Steam              ◆ Xbox Game Pass / MS Store            │" -ForegroundColor White
+    Write-Host "  │    ◆ Epic Games Store   ◆ Amazon Games                         │" -ForegroundColor White
+    Write-Host "  │    ◆ GOG Galaxy         ◆ EA App / Origin                      │" -ForegroundColor White
+    Write-Host "  │    ◆ Ubisoft Connect    ◆ Battle.net                           │" -ForegroundColor White
+    Write-Host "  │    ◆ Standalone Games (filesystem scan with engine detection)  │" -ForegroundColor White
+    Write-Host "  │                                                                │" -ForegroundColor DarkGray
+    Write-Host "  └────────────────────────────────────────────────────────────────┘" -ForegroundColor DarkGray
+    Write-Host ""
+
+    # Quick Start
+    Write-Host "  ╭────────────────────────────────────────────────────────────────╮" -ForegroundColor Cyan
+    Write-Host "  │  QUICK START                                                   │" -ForegroundColor Yellow
+    Write-Host "  ╰────────────────────────────────────────────────────────────────╯" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "  Preview what games would be found (no files created):" -ForegroundColor DarkGray
+    Write-Host '    .\WindowsGameExport.ps1 -DryRun' -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  Create launcher files in a directory:" -ForegroundColor DarkGray
+    Write-Host '    .\WindowsGameExport.ps1 -OutputDirectory "C:\GameLaunchers"' -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  Scan specific drives only:" -ForegroundColor DarkGray
+    Write-Host '    .\WindowsGameExport.ps1 -Drives "D:", "E:" -OutputDirectory "D:\Launchers"' -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  Include standalone games (slower, more thorough):" -ForegroundColor DarkGray
+    Write-Host '    .\WindowsGameExport.ps1 -IncludeFilesystemScan -OutputDirectory "C:\Launchers"' -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  Skip online verification (faster, trust all detected):" -ForegroundColor DarkGray
+    Write-Host '    .\WindowsGameExport.ps1 -SkipVerification -OutputDirectory "C:\Launchers"' -ForegroundColor Green
+    Write-Host ""
+
+    # Parameters
+    Write-Host "  ╭────────────────────────────────────────────────────────────────╮" -ForegroundColor Cyan
+    Write-Host "  │  PARAMETERS                                                    │" -ForegroundColor Yellow
+    Write-Host "  ╰────────────────────────────────────────────────────────────────╯" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "    -OutputDirectory      Where to create .bat launcher files" -ForegroundColor White
+    Write-Host "    -Drives               Specific drives to scan (default: all fixed)" -ForegroundColor DarkGray
+    Write-Host "    -DryRun               Preview without creating files" -ForegroundColor DarkGray
+    Write-Host "    -IncludeFilesystemScan  Scan for standalone games" -ForegroundColor DarkGray
+    Write-Host "    -SkipVerification     Skip Wikipedia/IGN verification" -ForegroundColor DarkGray
+    Write-Host "    -IgnoreUnverified     Don't create launchers for unverified items" -ForegroundColor DarkGray
+    Write-Host "    -Exclude              Directories to skip during filesystem scan" -ForegroundColor DarkGray
+    Write-Host "    -RawgApiKey           Optional RAWG API key for better verification" -ForegroundColor DarkGray
+    Write-Host "    -ConfigFile           Custom state file path" -ForegroundColor DarkGray
+    Write-Host ""
+
+    # Verification info
+    Write-Host "  ┌────────────────────────────────────────────────────────────────┐" -ForegroundColor DarkGray
+    Write-Host "  │  GAME VERIFICATION                                             │" -ForegroundColor Yellow
+    Write-Host "  │                                                                │" -ForegroundColor DarkGray
+    Write-Host "  │  Games from trusted platforms (Steam, Epic, GOG, etc.) are     │" -ForegroundColor White
+    Write-Host "  │  auto-verified. Xbox/MS Store items are verified via:          │" -ForegroundColor White
+    Write-Host "  │                                                                │" -ForegroundColor DarkGray
+    Write-Host "  │    1. Wikipedia API (searches for video game articles)         │" -ForegroundColor White
+    Write-Host "  │    2. IGN Game Database (checks for game pages)                │" -ForegroundColor White
+    Write-Host "  │    3. RAWG API (optional, requires free API key)               │" -ForegroundColor White
+    Write-Host "  │                                                                │" -ForegroundColor DarkGray
+    Write-Host "  │  Unverified items go to an 'Unverified' subfolder.             │" -ForegroundColor White
+    Write-Host "  │                                                                │" -ForegroundColor DarkGray
+    Write-Host "  └────────────────────────────────────────────────────────────────┘" -ForegroundColor DarkGray
+    Write-Host ""
+
+    # Footer
+    Write-Host "  ════════════════════════════════════════════════════════════════" -ForegroundColor DarkGray
+    Write-Host "  For help: Get-Help .\WindowsGameExport.ps1 -Full" -ForegroundColor DarkGray
+    Write-Host "  GitHub: https://github.com/johnray/WindowsGameExport" -ForegroundColor DarkGray
+    Write-Host "  ════════════════════════════════════════════════════════════════" -ForegroundColor DarkGray
+    Write-Host ""
+}
+
+# Check if script was run without meaningful parameters - show welcome screen
+$hasAction = $OutputDirectory -or $DryRun -or $PSBoundParameters.ContainsKey('Drives')
+if (-not $hasAction) {
+    Show-WelcomeScreen
+    exit 0
+}
+
+#endregion
 
 #region Helper Functions
 
@@ -836,20 +959,26 @@ function Get-BattleNetGames {
     $battleNetGames = @{
         'wow' = 'World of Warcraft'
         'wow_classic' = 'World of Warcraft Classic'
+        'wow_classic_era' = 'World of Warcraft Classic Era'
         'd3' = 'Diablo III'
         'd4' = 'Diablo IV'
+        'd2r' = 'Diablo II Resurrected'
         'hs' = 'Hearthstone'
         'hero' = 'Heroes of the Storm'
         'pro' = 'Overwatch 2'
         's1' = 'StarCraft Remastered'
         's2' = 'StarCraft II'
         'w3' = 'Warcraft III Reforged'
+        'wlby' = 'Crash Bandicoot 4'
         'viper' = 'Call of Duty Black Ops Cold War'
         'odin' = 'Call of Duty Modern Warfare'
         'lazr' = 'Call of Duty MW2 Campaign Remastered'
         'zeus' = 'Call of Duty Black Ops 4'
         'fore' = 'Call of Duty Vanguard'
         'auks' = 'Call of Duty Modern Warfare II'
+        'spot' = 'Call of Duty Modern Warfare III'
+        'cods' = 'Call of Duty Warzone'
+        'rtro' = 'Blizzard Arcade Collection'
     }
 
     # Check registry for individual games
@@ -1186,41 +1315,147 @@ function Get-FilesystemGames {
 #region Verification Functions
 
 function Test-WikipediaSearch {
-    # Simple: Search Wikipedia for "[name]" and check if "game" appears prominently
+    # Search Wikipedia for an article about this item
+    # Then fetch that article's intro and check if "game" appears in first 3 sentences
     param([string]$Name)
 
     $normalized = Get-NormalizedGameName -Name $Name
-    $encoded = [System.Web.HttpUtility]::UrlEncode($normalized)
+    $nameLower = $normalized.ToLower()
 
-    # Search Wikipedia for the name
-    $url = "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=$encoded&srlimit=3&format=json"
+    # Helper to check if article intro describes this AS a video game
+    # Returns $true if it's a game, $false if explicitly NOT a game, $null if inconclusive
+    function Test-ArticleIsGame {
+        param([string]$Title)
+
+        try {
+            $encodedTitle = [System.Web.HttpUtility]::UrlEncode($Title)
+            # Get the first 5 sentences of the article
+            $url = "https://en.wikipedia.org/w/api.php?action=query&titles=$encodedTitle&prop=extracts&exintro=1&explaintext=1&exsentences=5&format=json"
+            $response = Invoke-RestMethod -Uri $url -Method Get -TimeoutSec 10 -ErrorAction Stop
+
+            $pages = $response.query.pages
+            $pageId = ($pages.PSObject.Properties | Select-Object -First 1).Name
+            if ($pageId -eq '-1') { return $null }
+
+            $extract = $pages.$pageId.extract
+            if (-not $extract) { return $null }
+
+            $extractLower = $extract.ToLower()
+
+            # First check: Does "game" appear at all in the first 5 sentences?
+            if ($extractLower -notmatch '\bgame\b') {
+                # No mention of "game" - not a video game
+                return $null
+            }
+
+            # NEGATIVE patterns - these are game-RELATED but NOT games themselves
+            # Check these FIRST to avoid false positives
+            if ($extractLower -match 'game console' -or
+                $extractLower -match 'gaming brand' -or
+                $extractLower -match 'gaming service' -or
+                $extractLower -match 'gaming platform' -or
+                $extractLower -match 'video gaming brand' -or
+                $extractLower -match 'game streaming' -or
+                $extractLower -match 'game controller' -or
+                $extractLower -match 'game development' -or
+                $extractLower -match 'game engine') {
+                Write-Verbose "Wikipedia: '$Title' is game-related but NOT a game (console/brand/service)"
+                return $false
+            }
+
+            # POSITIVE patterns - these describe something AS a video game
+            if ($extractLower -match '\bis a[n]?\s+\d*\s*\w*\s*video game\b' -or    # "is a 2024 survival video game"
+                $extractLower -match '\bis a[n]?\s+\w+\s+game\b' -or                 # "is a puzzle game"
+                $extractLower -match 'video game developed' -or
+                $extractLower -match 'video game published' -or
+                $extractLower -match 'developed by .+ and published' -or
+                $extractLower -match 'roguelike' -or
+                $extractLower -match 'roguelite' -or
+                $extractLower -match 'platformer' -or
+                $extractLower -match 'first-person shooter' -or
+                $extractLower -match 'third-person shooter' -or
+                $extractLower -match 'action-adventure game' -or
+                $extractLower -match 'role-playing game' -or
+                $extractLower -match 'survival horror' -or
+                $extractLower -match 'open world' -or
+                $extractLower -match 'driving game' -or
+                $extractLower -match 'simulation game' -or
+                $extractLower -match 'indie game') {
+                Write-Verbose "Wikipedia: '$Title' intro describes a video game"
+                return $true
+            }
+
+            return $null
+        } catch {
+            return $null
+        }
+    }
 
     try {
-        $response = Invoke-RestMethod -Uri $url -Method Get -TimeoutSec 10 -ErrorAction Stop
+        # Strategy 1: Search for just the name, find best matching article
+        $encoded1 = [System.Web.HttpUtility]::UrlEncode($normalized)
+        $url1 = "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=$encoded1&srlimit=5&format=json"
+        $response1 = Invoke-RestMethod -Uri $url1 -Method Get -TimeoutSec 10 -ErrorAction Stop
 
-        if ($response.query.search.Count -gt 0) {
-            $nameLower = $normalized.ToLower()
-
-            foreach ($result in $response.query.search) {
+        if ($response1.query.search.Count -gt 0) {
+            foreach ($result in $response1.query.search) {
                 $title = $result.title
                 $titleLower = $title.ToLower()
 
-                # Check if this result is about our item
-                if (-not $titleLower.Contains($nameLower.Split(' ')[0])) {
-                    continue
-                }
+                # Get base title without disambiguation suffix like "(video game)"
+                $baseTitle = ($title -replace '\s*\([^)]+\)\s*$', '').ToLower().Trim()
 
-                # Simple check: Does the title or snippet say "game"?
-                $snippet = $result.snippet -replace '<[^>]+>', ''
-                $combined = "$title $snippet"
+                # Title must closely match our search term
+                # Either: title starts with our name, OR our name starts with title, OR exact match
+                $isRelevant = $baseTitle -eq $nameLower -or
+                              $baseTitle.StartsWith($nameLower) -or
+                              $nameLower.StartsWith($baseTitle) -or
+                              ($baseTitle.Split(' ')[0] -eq $nameLower.Split(' ')[0] -and $nameLower.Split(' ')[0].Length -ge 4)
 
-                if ($combined -match '\bgame\b') {
-                    Write-Verbose "Wikipedia: '$title' mentions game"
+                if (-not $isRelevant) { continue }
+
+                # If title explicitly says "(video game)" - strong match
+                if ($title -match '\(video game\)' -or $title -match '\(game\)') {
+                    Write-Verbose "Wikipedia: '$title' has (video game) disambiguation"
                     return $true
-                } else {
-                    Write-Verbose "Wikipedia: '$title' does NOT mention game"
-                    return $false
                 }
+
+                # Fetch article and check intro
+                $check = Test-ArticleIsGame -Title $title
+                if ($null -ne $check) { return $check }
+            }
+        }
+
+        # Strategy 2: Search with "video game" appended
+        Start-Sleep -Milliseconds 200
+        $encoded2 = [System.Web.HttpUtility]::UrlEncode("$normalized video game")
+        $url2 = "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=$encoded2&srlimit=3&format=json"
+        $response2 = Invoke-RestMethod -Uri $url2 -Method Get -TimeoutSec 10 -ErrorAction Stop
+
+        if ($response2.query.search.Count -gt 0) {
+            foreach ($result in $response2.query.search) {
+                $title = $result.title
+
+                # Get base title without disambiguation suffix
+                $baseTitle = ($title -replace '\s*\([^)]+\)\s*$', '').ToLower().Trim()
+
+                # Title must closely match our search term
+                $isRelevant = $baseTitle -eq $nameLower -or
+                              $baseTitle.StartsWith($nameLower) -or
+                              $nameLower.StartsWith($baseTitle) -or
+                              ($baseTitle.Split(' ')[0] -eq $nameLower.Split(' ')[0] -and $nameLower.Split(' ')[0].Length -ge 4)
+
+                if (-not $isRelevant) { continue }
+
+                # If title explicitly says "(video game)" - strong match
+                if ($title -match '\(video game\)' -or $title -match '\(game\)') {
+                    Write-Verbose "Wikipedia: Found matching game article '$title'"
+                    return $true
+                }
+
+                # Fetch article and check intro
+                $check = Test-ArticleIsGame -Title $title
+                if ($null -ne $check) { return $check }
             }
         }
 
@@ -1335,11 +1570,24 @@ function Test-WikipediaGame {
                 'is an? .*shooter',
                 'is an? .*platformer',
                 'is an? .*strategy game',
-                'is an? .*simulation',
+                'is an? .*simulation game',
+                'is an? .*survival game',
+                'is an? .*horror game',
                 'is an? .*racing game',
                 'is an? .*puzzle game',
+                'is an? .*roguelike',
+                'is an? .*roguelite',
+                'is an? .*sandbox',
+                'is an? .*open world',
+                'is an? .*indie game',
                 'video game developed by',
-                'video game published by'
+                'video game published by',
+                'game developed by',
+                'developed and published.*game',
+                'available on.*Steam',
+                'available on.*PlayStation',
+                'available on.*Xbox',
+                'available on.*Nintendo'
             )
 
             foreach ($pattern in $gamePatterns) {
@@ -1354,6 +1602,74 @@ function Test-WikipediaGame {
     } catch {
         Write-Verbose "Wikipedia API error for '$GameName': $_"
         return $null  # Unknown, API failed
+    }
+}
+
+function Test-IGNGame {
+    # Check if game exists on IGN's game database
+    # IGN only has pages in /games/ for actual video games
+    [CmdletBinding()]
+    param(
+        [string]$GameName
+    )
+
+    $normalized = Get-NormalizedGameName -Name $GameName
+
+    # Convert game name to URL slug (lowercase, replace spaces with hyphens, remove special chars)
+    $slug = $normalized.ToLower() -replace "[^a-z0-9\s-]", "" -replace "\s+", "-"
+    $url = "https://www.ign.com/games/$slug"
+
+    try {
+        # Use HttpWebRequest to check for redirects
+        $request = [System.Net.HttpWebRequest]::Create($url)
+        $request.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        $request.AllowAutoRedirect = $false
+        $request.Timeout = 10000
+
+        $response = $request.GetResponse()
+        $statusCode = [int]$response.StatusCode
+
+        # If redirected, check if it's a close match (IGN sometimes adds publisher suffix)
+        if ($statusCode -eq 301 -or $statusCode -eq 302) {
+            $redirectUrl = $response.Headers["Location"]
+            $response.Close()
+
+            # Only follow redirect if the slug is nearly identical
+            # Allow: "game" -> "game-1", "game-pc", "game-2024"
+            # Reject: "bridge" -> "bridge-activision" (different game)
+            if ($redirectUrl -and $redirectUrl -match "/games/([^/]+)") {
+                $redirectSlug = $Matches[1]
+                # Must be exact match, or only differ by short numeric/platform suffix
+                $isCloseMatch = $redirectSlug -eq $slug -or
+                                $redirectSlug -match "^$([regex]::Escape($slug))(-\d+|-pc|-ps\d*|-xbox.*|-switch|-wii.*)?$"
+                if (-not $isCloseMatch) {
+                    Write-Verbose "IGN: Redirect to different game ($redirectSlug) - skipping"
+                    return $null
+                }
+                $url = "https://www.ign.com$redirectUrl"
+            }
+        } else {
+            $response.Close()
+        }
+
+        # Now fetch the actual page content
+        $webClient = New-Object System.Net.WebClient
+        $webClient.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        $content = $webClient.DownloadString($url)
+
+        # IGN game pages have og:type="Game" in their meta tags
+        if ($content -match 'og:type.*content="Game"') {
+            Write-Verbose "IGN: Found game page for '$GameName'"
+            return $true
+        }
+
+        return $null
+    } catch [System.Net.WebException] {
+        # 404 means game not found on IGN
+        return $null
+    } catch {
+        Write-Verbose "IGN error for '$GameName': $_"
+        return $null
     }
 }
 
@@ -1418,6 +1734,129 @@ function Confirm-IsGame {
 
     Write-Verbose "Verifying: $GameName ($Platform)"
 
+    # Detect garbled UWP package names (like "W eb Me di aE xt en si on s")
+    # These have many 1-2 character "words" from mangled package names
+    $words = $GameName -split '\s+'
+    if ($words.Count -gt 3) {
+        $shortWords = ($words | Where-Object { $_.Length -le 2 }).Count
+        $ratio = $shortWords / $words.Count
+        if ($ratio -gt 0.4) {
+            Write-Verbose "Garbled package name detected (ratio=$ratio) - not a game"
+            return $false
+        }
+    }
+
+    # Detect codec/extension packages by name pattern
+    # These are media extensions, not games
+    $extensionPatterns = @(
+        'Extension$',
+        'Extensions$',
+        'Video Extension',
+        'Image Extension',
+        'Codec$',
+        'Video Codec',
+        'Audio Codec',
+        'Media Extension',
+        'Web Extension',
+        'VP9',
+        'HEVC',
+        'AV1',
+        'HEIF',
+        'MPEG',
+        'AVC Encoder',
+        'Webp Image',
+        'Raw Image'
+    )
+    foreach ($pattern in $extensionPatterns) {
+        if ($GameName -match $pattern) {
+            Write-Verbose "Extension/codec pattern detected ($pattern) - not a game"
+            return $false
+        }
+    }
+
+    # Detect Microsoft/Windows service apps by pattern
+    $servicePatterns = @(
+        '^Bing',           # BingNews, BingWeather, BingSearch
+        'Subsystem',       # Windows Subsystem for Linux
+        'Cross Device',
+        'Speech To Text',
+        'Identity Provider',
+        '^Zune'            # ZuneMusic, ZuneVideo
+    )
+    foreach ($pattern in $servicePatterns) {
+        if ($GameName -match $pattern) {
+            Write-Verbose "Windows service pattern detected ($pattern) - not a game"
+            return $false
+        }
+    }
+
+    # Windows built-in apps that are definitely NOT games
+    # These are bundled with Windows and checking Wikipedia for them is pointless
+    $windowsBuiltInApps = @(
+        'Microsoft Edge',
+        'Microsoft Teams',
+        'Microsoft Store',
+        'Microsoft Photos',
+        'Microsoft Paint',
+        'Microsoft 365 Copilot',
+        'Microsoft Sticky Notes',
+        'Windows Terminal',
+        'Windows Photos',
+        'Windows Camera',
+        'Windows Calculator',
+        'Windows Alarms',
+        'Windows Notepad',
+        'Windows Sound Recorder',
+        'Windows Feedback Hub',
+        'Windows Web Experience Pack',
+        'Widgets Platform Runtime',
+        'Xbox TCUI',
+        'Xbox',
+        'Game Bar',
+        'Paint',
+        'Photos',
+        'Calculator',
+        'Camera',
+        'Notepad',
+        'OneDrive',
+        'Outlook for Windows',
+        'iCloud',
+        'Ubuntu',
+        'NVIDIA Control Panel',
+        'AMD Radeon Software',
+        'Realtek Audio Control',
+        'MSI Center',
+        'Clipchamp',
+        'Todos',
+        'Get Help',
+        'Snipping Tool',
+        'Screen Sketch',
+        'Your Phone',
+        'Phone Link',
+        'Drivers',
+        'Driver',
+        'Control Panel',
+        'Settings',
+        'Device Manager',
+        'Keeper',
+        'Power Automate',
+        'Quick Assist',
+        'Dev Home',
+        'Ink.Handwriting',
+        'Gaming Services',
+        'Start Experiences',
+        'Store Purchase',
+        'Desktop App Installer',
+        'Identity Provider'
+    )
+    $normalizedName = $GameName.ToLower().Trim()
+    foreach ($app in $windowsBuiltInApps) {
+        if ($normalizedName -eq $app.ToLower() -or $normalizedName -like "*$($app.ToLower())*") {
+            Write-Verbose "Known Windows built-in app: $GameName - not a game"
+            return $false
+        }
+    }
+
     # Trusted gaming platforms - these don't distribute non-games
     # If something is from Steam/Epic/GOG/Battle.net, it's a game
     $trustedPlatforms = @('Steam', 'Epic', 'GOG', 'Battle.net', 'Amazon', 'EA', 'Ubisoft')
@@ -1455,6 +1894,14 @@ function Confirm-IsGame {
         return $false
     }
 
+    # Try IGN game database
+    $ignResult = Test-IGNGame -GameName $GameName
+    Start-Sleep -Milliseconds 300
+
+    if ($ignResult -eq $true) {
+        return $true
+    }
+
     # Try RAWG if available
     if ($RawgApiKey) {
         $rawgResult = Test-RawgGame -GameName $GameName -ApiKey $RawgApiKey
@@ -1486,6 +1933,16 @@ function New-GameLauncher {
 
     $sanitizedName = Get-SanitizedFileName -Name $Game.Name
     $fileName = "$sanitizedName ($($Game.Platform)).bat"
+
+    # Handle empty OutputDirectory in DryRun mode
+    if (-not $OutputDirectory) {
+        if ($DryRun) {
+            $displayPath = if ($Game.Verified) { "<output>\" } else { "<output>\Unverified\" }
+            Write-Host "Would create: $displayPath$fileName" -ForegroundColor Cyan
+            return $fileName
+        }
+        throw "OutputDirectory is required when not in DryRun mode"
+    }
 
     $targetDir = if ($Game.Verified) { $OutputDirectory } else { Join-Path $OutputDirectory "Unverified" }
     $filePath = Join-Path $targetDir $fileName
@@ -1604,7 +2061,12 @@ if (-not $OutputDirectory -and -not $DryRun) {
 
 # Ensure output directory exists
 if ($OutputDirectory -and -not (Test-Path $OutputDirectory) -and -not $DryRun) {
-    New-Item -Path $OutputDirectory -ItemType Directory -Force | Out-Null
+    try {
+        New-Item -Path $OutputDirectory -ItemType Directory -Force -ErrorAction Stop | Out-Null
+    } catch {
+        Write-Error "Failed to create output directory '$OutputDirectory': $_"
+        exit 1
+    }
 }
 
 # State file
@@ -1653,7 +2115,7 @@ Write-Host "  ------------------------------------------------------------" -For
 # Helper to format platform results
 function Write-PlatformLine {
     param([string]$Name, [int]$Count, [string]$Color = "White")
-    $countStr = if ($Count -gt 0) { "$Count games" } else { "-" }
+    $countStr = if ($Count -gt 0) { "$Count potential" } else { "-" }
     $countColor = if ($Count -gt 0) { "Green" } else { "DarkGray" }
     Write-Host "    " -NoNewline
     Write-Host "$Name".PadRight(20) -ForegroundColor $Color -NoNewline
@@ -1707,45 +2169,44 @@ if ($IncludeFilesystemScan) {
     $allGames += $fsGames
 }
 
+# Deduplicate games (same name from multiple sources)
+$seenNames = @{}
+$uniqueGames = @()
+$duplicatesRemoved = 0
+foreach ($game in $allGames) {
+    $normalizedName = $game.Name.ToLower().Trim()
+    if ($seenNames.ContainsKey($normalizedName)) {
+        $duplicatesRemoved++
+        Write-Verbose "Duplicate removed: $($game.Name) ($($game.Platform)) - already have from $($seenNames[$normalizedName])"
+    } else {
+        $seenNames[$normalizedName] = $game.Platform
+        $uniqueGames += $game
+    }
+}
+$allGames = $uniqueGames
+
 Write-Host "  ------------------------------------------------------------" -ForegroundColor DarkGray
 Write-Host "    TOTAL" -ForegroundColor White -NoNewline
-Write-Host "               $($allGames.Count) games" -ForegroundColor Cyan
+$totalMsg = "$($allGames.Count) potential games"
+if ($duplicatesRemoved -gt 0) {
+    $totalMsg += " ($duplicatesRemoved duplicates removed)"
+}
+Write-Host "               $totalMsg" -ForegroundColor Cyan
 Write-Host ""
 
-# DryRun mode - just output the list
-if ($DryRun) {
-    Write-Host "  Detected Games:" -ForegroundColor Cyan
-    Write-Host "  ------------------------------------------------------------" -ForegroundColor DarkGray
-
-    $sortedGames = $allGames | Sort-Object Platform, Name
-    $currentPlatform = ""
-
-    foreach ($game in $sortedGames) {
-        if ($game.Platform -ne $currentPlatform) {
-            $currentPlatform = $game.Platform
-            Write-Host ""
-            Write-Host "    [$currentPlatform]" -ForegroundColor Yellow
-        }
-        Write-Host "      > $($game.Name)" -ForegroundColor White
-        Write-Host "        $($game.Path)" -ForegroundColor DarkGray
-    }
-
-    Write-Host ""
-    Write-Host "  ============================================================" -ForegroundColor Green
-    Write-Host "    Dry run complete. No files were created." -ForegroundColor Yellow
-    Write-Host "  ============================================================" -ForegroundColor Green
-    Write-Host ""
-    exit 0
-}
+# DryRun mode still runs verification to show what would be kept/filtered
 
 # Verify games
 if (-not $SkipVerification -and $allGames.Count -gt 0) {
-    Write-Host "  Verifying games (Wikipedia/RAWG)..." -ForegroundColor Cyan
+    Write-Host "  Verifying games (Wikipedia/IGN/RAWG)..." -ForegroundColor Cyan
     Write-Host "  ------------------------------------------------------------" -ForegroundColor DarkGray
     $verified = 0
     $unverified = 0
+    $currentIndex = 0
+    $totalGames = $allGames.Count
 
     foreach ($game in $allGames) {
+        $currentIndex++
         # Xbox games from XboxGames folder are trusted (Game Pass games)
         if ($game.Platform -eq 'Xbox' -and $game.Path -match '\\XboxGames\\') {
             $isVerified = $true
@@ -1755,22 +2216,36 @@ if (-not $SkipVerification -and $allGames.Count -gt 0) {
         }
         $game.Verified = $isVerified
 
+        # Show progress counter
+        $progress = "[$currentIndex/$totalGames]".PadRight(10)
+
         if ($isVerified) {
             $verified++
-            Write-Host "    [OK] " -ForegroundColor Green -NoNewline
+            Write-Host "    $progress" -ForegroundColor DarkGray -NoNewline
+            Write-Host "[OK] " -ForegroundColor Green -NoNewline
             Write-Host "$($game.Name)" -ForegroundColor White
         } else {
             $unverified++
-            Write-Host "    [??] " -ForegroundColor Yellow -NoNewline
-            Write-Host "$($game.Name)" -ForegroundColor DarkGray
+            Write-Host "    $progress" -ForegroundColor DarkGray -NoNewline
+            Write-Host "[??] " -ForegroundColor Yellow -NoNewline
+            # Try strikethrough with ANSI escape code (may not work in all terminals)
+            $esc = [char]27
+            Write-Host "$esc[9m$($game.Name)$esc[0m" -ForegroundColor DarkGray
         }
     }
 
     Write-Host "  ------------------------------------------------------------" -ForegroundColor DarkGray
     Write-Host "    Verified: $verified  |  Unverified: $unverified" -ForegroundColor Cyan
     Write-Host ""
-} else {
+} elseif ($SkipVerification -and $allGames.Count -gt 0) {
     # Mark all as verified if skipping verification
+    Write-Host "  Verification skipped - all $($allGames.Count) games marked as verified" -ForegroundColor Yellow
+    Write-Host ""
+    foreach ($game in $allGames) {
+        $game.Verified = $true
+    }
+} else {
+    # No games to verify
     foreach ($game in $allGames) {
         $game.Verified = $true
     }
@@ -1782,8 +2257,12 @@ Write-Host "  ------------------------------------------------------------" -For
 $results = Update-GameLaunchers -Games $allGames -OutputDirectory $OutputDirectory -State $state -DryRun:$DryRun -IgnoreUnverified:$IgnoreUnverified
 
 # Save state
-if (-not $DryRun) {
-    $state | ConvertTo-Json -Depth 10 | Set-Content -Path $ConfigFile
+if (-not $DryRun -and $ConfigFile) {
+    try {
+        $state | ConvertTo-Json -Depth 10 | Set-Content -Path $ConfigFile -ErrorAction Stop
+    } catch {
+        Write-Warning "Failed to save state file: $_"
+    }
 }
 
 # Summary
@@ -1803,7 +2282,9 @@ if ($results.Skipped -gt 0) {
     Write-Host "$($results.Skipped) unverified" -ForegroundColor DarkYellow
 }
 Write-Host ""
-Write-Host "    Output: $OutputDirectory" -ForegroundColor White
-Write-Host ""
+if (-not $DryRun -and $OutputDirectory) {
+    Write-Host "    Output: $OutputDirectory" -ForegroundColor White
+    Write-Host ""
+}
 
 #endregion
