@@ -134,7 +134,7 @@ function Show-WelcomeScreen {
     Write-Host "  |    * Epic Games Store   * Amazon Games                           |" -ForegroundColor White
     Write-Host "  |    * GOG Galaxy         * EA App / Origin                        |" -ForegroundColor White
     Write-Host "  |    * Ubisoft Connect    * Battle.net                             |" -ForegroundColor White
-    Write-Host "  |    * Standalone Games (filesystem scan with engine detection)   |" -ForegroundColor White
+    Write-Host "  |    * Standalone Games (filesystem scan with engine detection)    |" -ForegroundColor White
     Write-Host "  |                                                                  |" -ForegroundColor DarkGray
     Write-Host "  +------------------------------------------------------------------+" -ForegroundColor DarkGray
     Write-Host ""
