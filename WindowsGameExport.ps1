@@ -1579,26 +1579,10 @@ function Test-WikipediaGame {
     # Get both categories and a snippet of the page content
     $url = "https://en.wikipedia.org/w/api.php?action=query&titles=$encoded&prop=categories|extracts&cllimit=50&exintro=1&explaintext=1&exsentences=5&format=json"
 
-    try {
-        $response = Invoke-RestMethod -Uri $url -Method Get -ErrorAction Stop
+    # Helper function to check a Wikipedia page for game indicators
+    function Test-WikipediaPage {
+        param($page)
 
-        # Check if page exists
-        $pages = $response.query.pages
-        $pageId = ($pages.PSObject.Properties | Select-Object -First 1).Name
-
-        if ($pageId -eq '-1') {
-            # Page not found, try with " (video game)" suffix
-            $url2 = "https://en.wikipedia.org/w/api.php?action=query&titles=$encoded%20(video%20game)&prop=categories|extracts&cllimit=50&exintro=1&explaintext=1&exsentences=5&format=json"
-            $response = Invoke-RestMethod -Uri $url2 -Method Get -ErrorAction Stop
-            $pages = $response.query.pages
-            $pageId = ($pages.PSObject.Properties | Select-Object -First 1).Name
-
-            if ($pageId -eq '-1') {
-                return $null  # Not found
-            }
-        }
-
-        $page = $pages.$pageId
         $extract = $page.extract
 
         # First check if it's explicitly NOT a game (check extract text)
@@ -1626,14 +1610,22 @@ function Test-WikipediaGame {
 
             foreach ($pattern in $nonGamePatterns) {
                 if ($extract -match $pattern) {
-                    Write-Verbose "Wikipedia found non-game pattern '$pattern' for '$GameName'"
-                    return $false
+                    return @{ Result = $false; Reason = "non-game pattern '$pattern'" }
+                }
+            }
+        }
+
+        # Check if this is a disambiguation page
+        $categories = $page.categories
+        if ($categories) {
+            foreach ($cat in $categories) {
+                if ($cat.title -match 'disambiguation') {
+                    return @{ Result = $null; Reason = "disambiguation page" }
                 }
             }
         }
 
         # Check categories for video game indicators (most reliable)
-        $categories = $page.categories
         if ($categories) {
             $gameCategoryPatterns = @(
                 'video games$',
@@ -1653,8 +1645,7 @@ function Test-WikipediaGame {
             foreach ($cat in $categories) {
                 foreach ($pattern in $gameCategoryPatterns) {
                     if ($cat.title -match $pattern) {
-                        Write-Verbose "Wikipedia found game category '$($cat.title)' for '$GameName'"
-                        return $true
+                        return @{ Result = $true; Reason = "category '$($cat.title)'" }
                     }
                 }
             }
@@ -1693,9 +1684,54 @@ function Test-WikipediaGame {
 
             foreach ($pattern in $gamePatterns) {
                 if ($extract -match $pattern) {
-                    Write-Verbose "Wikipedia found game pattern '$pattern' for '$GameName'"
-                    return $true
+                    return @{ Result = $true; Reason = "pattern '$pattern'" }
                 }
+            }
+        }
+
+        return @{ Result = $null; Reason = "no game indicators found" }
+    }
+
+    try {
+        # Try direct search first
+        $response = Invoke-RestMethod -Uri $url -Method Get -ErrorAction Stop
+        $pages = $response.query.pages
+        $pageId = ($pages.PSObject.Properties | Select-Object -First 1).Name
+
+        $directResult = $null
+        if ($pageId -ne '-1') {
+            $page = $pages.$pageId
+            $check = Test-WikipediaPage -page $page
+            $directResult = $check.Result
+
+            if ($directResult -eq $true) {
+                Write-Verbose "Wikipedia found game via direct search for '$GameName': $($check.Reason)"
+                return $true
+            }
+            if ($directResult -eq $false) {
+                Write-Verbose "Wikipedia found non-game via direct search for '$GameName': $($check.Reason)"
+                return $false
+            }
+            # If $null (disambiguation or inconclusive), continue to try suffix search
+        }
+
+        # Try with " (video game)" suffix
+        $url2 = "https://en.wikipedia.org/w/api.php?action=query&titles=$encoded%20(video%20game)&prop=categories|extracts&cllimit=50&exintro=1&explaintext=1&exsentences=5&format=json"
+        $response2 = Invoke-RestMethod -Uri $url2 -Method Get -ErrorAction Stop
+        $pages2 = $response2.query.pages
+        $pageId2 = ($pages2.PSObject.Properties | Select-Object -First 1).Name
+
+        if ($pageId2 -ne '-1') {
+            $page2 = $pages2.$pageId2
+            $check2 = Test-WikipediaPage -page $page2
+
+            if ($check2.Result -eq $true) {
+                Write-Verbose "Wikipedia found game via '(video game)' suffix for '$GameName': $($check2.Reason)"
+                return $true
+            }
+            if ($check2.Result -eq $false) {
+                Write-Verbose "Wikipedia found non-game via '(video game)' suffix for '$GameName': $($check2.Reason)"
+                return $false
             }
         }
 
@@ -1939,7 +1975,7 @@ function Confirm-IsGame {
         'Control Panel',
         'Settings',
         'Device Manager',
-        'Keeper',
+        'Keeper Security',
         'Power Automate',
         'Quick Assist',
         'Dev Home',
