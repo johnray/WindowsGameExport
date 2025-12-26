@@ -216,14 +216,19 @@ if (-not $hasAction) {
 function Get-SanitizedFileName {
     param([string]$Name)
 
+    # Replace sequences of non-ASCII characters with a single space
+    # This handles garbled trademark symbols, etc. (e.g., "â„¢" -> " ")
+    $sanitized = $Name -replace '[^\x00-\x7F]+', ' '
+
     # Remove invalid filename characters
     $invalid = [System.IO.Path]::GetInvalidFileNameChars()
-    $sanitized = $Name
     foreach ($char in $invalid) {
         $sanitized = $sanitized.Replace([string]$char, '')
     }
     # Also remove some problematic characters
     $sanitized = $sanitized -replace '[<>:"/\\|?*]', ''
+    # Collapse multiple spaces into one
+    $sanitized = $sanitized -replace '\s+', ' '
     $sanitized = $sanitized.Trim()
     return $sanitized
 }
